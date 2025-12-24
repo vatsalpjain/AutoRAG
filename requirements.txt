@@ -1,0 +1,52 @@
+# CLI Framework
+typer[all]
+rich
+
+# Configuration
+pyyaml
+python-dotenv
+pydantic
+pydantic-settings
+
+# Async Processing
+celery
+redis
+
+# RAG Framework
+langchain
+langchain-openai
+langchain-pinecone
+langchain-community
+
+# Vector Database
+pinecone-client
+
+# LLM APIs
+groq
+openai
+
+# Evaluation
+ragas
+
+# Database Connectors
+supabase
+pymongo
+psycopg2-binary
+
+# Optimization
+optuna
+
+# Utilities
+tiktoken
+httpx
+tenacity
+
+# Development & Packaging
+setuptools
+wheel
+twine
+build
+
+# Testing (optional for Week 4)
+pytest
+pytest-asyncio

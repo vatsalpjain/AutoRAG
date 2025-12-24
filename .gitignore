@@ -1,0 +1,68 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+*.pyo
+*.pyd
+*.so
+*.dll
+*.dylib
+build/
+dist/
+wheels/
+*.egg-info
+*.egg
+.Python
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Environment variables & configs with secrets
+.env
+.env.local
+config.yaml
+config.yml
+*.local.yaml
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Celery & Redis
+celerybeat-schedule
+celerybeat.pid
+*.db
+
+# AutoRAG specific
+results/
+logs/
+*.log
+optimization_results/
+synthetic_qa/
+.autorag_cache/
+
+# Temporary files
+*.tmp
+*.bak
+tmp/
+temp/
+
+# Project-specific
+AutoRAG_Platform.md
+
+# UV lock (optional - some teams commit this)
+# uv.lock
