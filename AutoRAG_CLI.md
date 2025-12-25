@@ -165,11 +165,13 @@ Generate:
 
 **Days 5-7:**
 
-* Basic RAG pipeline (LangChain)
-* Hardcode 1 config, make it work
-* Test: Query → Answer
+* Basic RAG pipeline ✓
+* Embeddings (sentence-transformers) ✓
+* Vector store (Pinecone) ✓
+* LLM generation (Groq) ✓
+* Test: Query → Answer ✓
 
-**Checkpoint:** Can connect DB and run RAG ⏳ (DB connection works, RAG pipeline pending)
+**Checkpoint:** Can connect DB and run RAG ✓
 
 ---
 
@@ -276,6 +278,8 @@ Generate:
 ## Project Structure
 
 ```
+
+
 autorag-optimizer/
 ├── autorag/
 │   ├── cli.py              # CLI commands
@@ -283,6 +287,10 @@ autorag-optimizer/
 │   │   ├── supabase.py
 │   │   ├── mongodb.py
 │   │   └── postgres.py
+│   ├── rag/  
+│   │ 	├── embeddings.py
+│   │ 	├── vector_store.py
+│   │  	└── pipeline.py
 │   ├── optimization/
 │   │   ├── grid_search.py
 │   │   └── bayesian.py     # Week 3+

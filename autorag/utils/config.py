@@ -75,6 +75,7 @@ class APIKeysConfig(BaseModel):
     
     groq: str = Field(description="Groq API key (required - default LLM)")
     pinecone: str = Field(description="Pinecone API key")
+    pinecone_index: str = Field(default="autorag", description="Pinecone index name")
     
     @field_validator("groq")
     @classmethod

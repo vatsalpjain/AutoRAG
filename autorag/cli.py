@@ -11,6 +11,7 @@ from typing import Dict, Any
 
 from autorag.utils.config import load_config
 from autorag.database.supabase import SupabaseConnector
+from autorag.rag.pipeline import RAGPipeline
 
 # Initialize Typer app and Rich console for beautiful terminal output
 app = typer.Typer(
@@ -144,13 +145,93 @@ def optimize(
     
     console.print("\n" + "─" * 60 + "\n")
     
+    # ========== INITIALIZE RAG PIPELINE ==========
+    console.print("[bold cyan]🤖 Initializing RAG Pipeline[/bold cyan]")
+    
+    try:
+        console.print("  Creating RAG pipeline...", end=" ")
+        pipeline = RAGPipeline(
+            groq_api_key=config.api_keys.groq,
+            pinecone_api_key=config.api_keys.pinecone,
+            pinecone_index=config.api_keys.pinecone_index
+        )
+        console.print("[green]✓[/green] Pipeline ready")
+        
+        # Check if index already has vectors
+        stats = pipeline.get_index_stats()
+        vector_count = stats.get('total_vector_count', 0)
+        console.print(f"  Vectors in Pinecone: [yellow]{vector_count}[/yellow]")
+        
+    except Exception as e:
+        console.print(f"[bold red]❌ Failed to initialize RAG pipeline:[/bold red]\n{e}")
+        raise typer.Exit(code=1)
+    
+    # ========== INDEX DOCUMENTS ==========
+    console.print("\n[bold cyan]📊 Indexing Documents[/bold cyan]")
+    
+    try:
+        # Ask user if they want to re-index (if vectors already exist)
+        if vector_count > 0:
+            console.print(f"  [yellow]⚠️  Index already contains {vector_count} vectors[/yellow]")
+            reindex = typer.confirm("  Do you want to clear and re-index?", default=False)
+            if reindex:
+                console.print("  Clearing existing vectors...", end=" ")
+                pipeline.clear_index()
+                console.print("[green]✓[/green] Cleared")
+            else:
+                console.print("  [dim]Skipping indexing, using existing vectors[/dim]")
+                skip_indexing = True
+        else:
+            skip_indexing = False
+        
+        if not skip_indexing:
+            console.print(f"  Embedding and indexing {len(documents)} documents...", end=" ")
+            pipeline.index_documents(documents)
+            console.print("[green]✓[/green] Indexed")
+            
+            # Verify indexing
+            new_stats = pipeline.get_index_stats()
+            new_count = new_stats.get('total_vector_count', 0)
+            console.print(f"  Total vectors in index: [yellow]{new_count}[/yellow]")
+        
+    except Exception as e:
+        console.print(f"[bold red]❌ Failed to index documents:[/bold red]\n{e}")
+        raise typer.Exit(code=1)
+    
+    # ========== TEST RAG QUERY ==========
+    console.print("\n[bold cyan]🧪 Testing RAG Pipeline[/bold cyan]")
+    
+    try:
+        # Test with a simple query
+        test_query = "What is the main topic discussed in these documents?"
+        console.print(f"  Query: [dim]{test_query}[/dim]\n")
+        
+        console.print("  Retrieving relevant documents...", end=" ")
+        result = pipeline.query(test_query, top_k=3)
+        console.print("[green]✓[/green] Done\n")
+        
+        # Display answer
+        console.print("  [bold]Answer:[/bold]")
+        console.print(f"  {result['answer']}\n")
+        
+        # Display sources
+        console.print("  [bold]Sources:[/bold]")
+        for i, source in enumerate(result['sources'], 1):
+            console.print(f"    {i}. Score: {source['score']:.3f} | {source['text']}")
+        
+    except Exception as e:
+        console.print(f"[bold red]❌ RAG query failed:[/bold red]\n{e}")
+        raise typer.Exit(code=1)
+    
+    console.print("\n" + "─" * 60 + "\n")
+    
     # TODO: Generate synthetic Q&A pairs
     # TODO: Run optimization experiments
     # TODO: Evaluate configurations
     # TODO: Save results
     
-    console.print("[yellow]⚠️  Optimization logic not yet implemented[/yellow]")
-    console.print("[dim]Next steps: Implement synthetic Q&A generation[/dim]")
+    console.print("[green]✅ RAG pipeline is working![/green]")
+    console.print("[dim]Next steps: Implement synthetic Q&A generation for optimization[/dim]")
 
 
 @app.command()
