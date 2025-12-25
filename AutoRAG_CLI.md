@@ -80,7 +80,7 @@ key: xxx
 table: documents
   
 api_keys:
-openai: sk-xxx
+groq: sk-xxx
 pinecone: pc-xxx
 
 optimization:
@@ -151,16 +151,17 @@ Generate:
 
 **Days 1-2:**
 
-* Project structure
-* CLI commands (Click/Typer)
-* Config file handling
-* Test `autorag init` works
+* Project structure ✓
+* CLI commands (Typer) ✓
+* Config file handling (Pydantic + YAML) ✓
+* ~~Test `autorag init` works~~ (Removed - using manual config.yaml instead)
 
 **Days 3-4:**
 
-* Database connectors (Supabase first)
-* Fetch documents
-* Test connection validation
+* Database connectors (Supabase) ✓
+* Fetch documents ✓
+* Test connection validation ✓
+* Note: Using HuggingFace embeddings (sentence-transformers) - no OpenAI dependency
 
 **Days 5-7:**
 
@@ -168,7 +169,7 @@ Generate:
 * Hardcode 1 config, make it work
 * Test: Query → Answer
 
-**Checkpoint:** Can connect DB and run RAG ✓
+**Checkpoint:** Can connect DB and run RAG ⏳ (DB connection works, RAG pipeline pending)
 
 ---
 

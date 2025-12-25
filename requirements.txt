@@ -20,6 +20,7 @@ langchain-community
 
 # Vector Database
 pinecone-client
+sentence-transformers
 
 # LLM APIs
 groq
