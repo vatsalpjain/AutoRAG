@@ -1,0 +1,138 @@
+{
+  "metadata": {
+    "timestamp": "2025-12-28T19:34:12.735551",
+    "total_configs_tested": 5,
+    "best_config": {
+      "top_k": 3,
+      "temperature": 0.3,
+      "name": "k3_t0.3"
+    }
+  },
+  "results": [
+    {
+      "config": {
+        "top_k": 3,
+        "temperature": 0.3,
+        "name": "k3_t0.3"
+      },
+      "metrics": {
+        "accuracy": 0.5,
+        "avg_tokens": 138.5,
+        "avg_latency_seconds": 0.8690345585346222,
+        "successful_queries": 8,
+        "total_queries": 8,
+        "ragas_answer_relevancy": null,
+        "ragas_faithfulness": null,
+        "ragas_context_precision": null,
+        "ragas_context_recall": null,
+        "ragas_answer_similarity": null
+      },
+      "scores": {
+        "accuracy_score": 0.5,
+        "cost_score": 0.8783487044356609,
+        "latency_score": 1.0319549402987278
+      },
+      "weighted_score": 0.5
+    },
+    {
+      "config": {
+        "top_k": 3,
+        "temperature": 0.7,
+        "name": "k3_t0.7"
+      },
+      "metrics": {
+        "accuracy": 0.5,
+        "avg_tokens": 134.125,
+        "avg_latency_seconds": 7.908589690923691,
+        "successful_queries": 8,
+        "total_queries": 8,
+        "ragas_answer_relevancy": null,
+        "ragas_faithfulness": null,
+        "ragas_context_precision": null,
+        "ragas_context_recall": null,
+        "ragas_answer_similarity": null
+      },
+      "scores": {
+        "accuracy_score": 0.5,
+        "cost_score": 0.8817370219332084,
+        "latency_score": 0.12486593003176599
+      },
+      "weighted_score": 0.5
+    },
+    {
+      "config": {
+        "top_k": 3,
+        "temperature": 1.0,
+        "name": "k3_t1.0"
+      },
+      "metrics": {
+        "accuracy": 0.5,
+        "avg_tokens": 140.625,
+        "avg_latency_seconds": 1.4956150650978088,
+        "successful_queries": 8,
+        "total_queries": 8,
+        "ragas_answer_relevancy": null,
+        "ragas_faithfulness": null,
+        "ragas_context_precision": null,
+        "ragas_context_recall": null,
+        "ragas_answer_similarity": null
+      },
+      "scores": {
+        "accuracy_score": 0.5,
+        "cost_score": 0.8767123287671232,
+        "latency_score": 0.6267175723480033
+      },
+      "weighted_score": 0.5
+    },
+    {
+      "config": {
+        "top_k": 5,
+        "temperature": 0.3,
+        "name": "k5_t0.3"
+      },
+      "metrics": {
+        "accuracy": 0.5,
+        "avg_tokens": 225.375,
+        "avg_latency_seconds": 1.4472849071025848,
+        "successful_queries": 8,
+        "total_queries": 8,
+        "ragas_answer_relevancy": null,
+        "ragas_faithfulness": null,
+        "ragas_context_precision": null,
+        "ragas_context_recall": null,
+        "ragas_answer_similarity": null
+      },
+      "scores": {
+        "accuracy_score": 0.5,
+        "cost_score": 0.8160767112108538,
+        "latency_score": 0.6462933848896517
+      },
+      "weighted_score": 0.5
+    },
+    {
+      "config": {
+        "top_k": 5,
+        "temperature": 0.7,
+        "name": "k5_t0.7"
+      },
+      "metrics": {
+        "accuracy": 0.5,
+        "avg_tokens": 227.125,
+        "avg_latency_seconds": 1.6226777732372284,
+        "successful_queries": 8,
+        "total_queries": 8,
+        "ragas_answer_relevancy": null,
+        "ragas_faithfulness": null,
+        "ragas_context_precision": null,
+        "ragas_context_recall": null,
+        "ragas_answer_similarity": null
+      },
+      "scores": {
+        "accuracy_score": 0.5,
+        "cost_score": 0.8149129061831517,
+        "latency_score": 0.5804916134262393
+      },
+      "weighted_score": 0.5
+    }
+  ]
+}

@@ -3,7 +3,7 @@ RAG Pipeline - orchestrates retrieval and generation.
 Combines embeddings, vector search, and LLM generation.
 """
 from typing import List, Dict, Any
-from groq import Groq
+from autorag.rag.groq_client import GroqMultiModelClient
 from autorag.rag.embeddings import EmbeddingService
 from autorag.rag.vector_store import VectorStore
 
@@ -15,8 +15,7 @@ class RAGPipeline:
         self,
         groq_api_key: str,
         pinecone_api_key: str,
-        pinecone_index: str,
-        model_name: str = "llama-3.3-70b-versatile"
+        pinecone_index: str
     ):
         """
         Initialize RAG pipeline.
@@ -25,7 +24,6 @@ class RAGPipeline:
             groq_api_key: Groq API key for LLM
             pinecone_api_key: Pinecone API key for vector store
             pinecone_index: Pinecone index name
-            model_name: Groq model to use (default: llama-3.3-70b-versatile)
         """
         # Initialize components
         self.embedder = EmbeddingService()
@@ -34,8 +32,7 @@ class RAGPipeline:
             index_name=pinecone_index,
             dimension=self.embedder.get_dimension()
         )
-        self.groq_client = Groq(api_key=groq_api_key)
-        self.model_name = model_name
+        self.groq_client = GroqMultiModelClient(api_key=groq_api_key)
     
     def index_documents(self, documents: List[Dict[str, Any]]):
         """
@@ -127,15 +124,14 @@ Question: {question}
 
 Answer: Provide a clear, concise answer based only on the information in the context. If the context doesn't contain relevant information, say so."""
 
-        # Call Groq API
+        # Call Groq API (model rotation handled by wrapper)
         response = self.groq_client.chat.completions.create(
-            model=self.model_name,
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that answers questions based on provided context."},
                 {"role": "user", "content": prompt}
             ],
             temperature=temperature,
-            max_tokens=500  # Limit response length
+            max_tokens=500
         )
         
         return response.choices[0].message.content

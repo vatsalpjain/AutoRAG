@@ -54,6 +54,7 @@ logs/
 optimization_results/
 synthetic_qa/
 .autorag_cache/
+.github/copilot-instructions.md
 
 # Temporary files
 *.tmp

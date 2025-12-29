@@ -179,21 +179,23 @@ Generate:
 
 **Days 8-10:**
 
-* Synthetic Q&A generator
-* Generate 20 questions
-* Validate manually
+* Synthetic Q&A generator ✓
+* Generate 20 questions ✓
+* Validate manually ✓
+* Note: Uses Groq LLM with JSON parsing, SequenceMatcher for validation
 
 **Days 11-12:**
 
-* Ragas evaluation
-* Cost tracking
-* Latency measurement
+* Ragas evaluation (Using SequenceMatcher similarity for MVP) ✓
+* Cost tracking ✓
+* Latency measurement ✓
+* Note: Simple string similarity used instead of Ragas for MVP; cost=token estimation (4 chars/token)
 
 **Days 13-14:**
 
-* Grid search (5 configs)
-* Test all, pick best
-* Save results to JSON
+* Grid search (9 configs: 3 top_k × 3 temperature) ✓
+* Test all, pick best ✓
+* Save results to JSON ✓
 
 **Checkpoint:** Can optimize and compare configs ✓
 
@@ -203,6 +205,7 @@ Generate:
 
 **Days 15-17:**
 
+* Ragas Evaluation
 * Celery + Redis setup
 * Move optimization to background
 * Progress tracking
@@ -211,14 +214,15 @@ Generate:
 
 * MongoDB + PostgreSQL connectors
 * Test on 3 databases
+* Bayesian Optimization
 
 **Days 20-21:**
 
-* Results formatting (table + HTML)
-* Error handling
-* Logging
+* Results formatting (table + HTML) ✓
+* Error handling ✓
+* Logging (Basic console logging via Rich) ✓
 
-**Checkpoint:** Package feature-complete ✓
+**Checkpoint:** Package feature-complete
 
 ---
 

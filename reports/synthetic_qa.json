@@ -1,0 +1,77 @@
+{
+  "metadata": {
+    "generated_at": "2025-12-29T09:26:32.253665",
+    "total_pairs": 7,
+    "statistics": {
+      "total_documents": 20,
+      "total_questions": 7,
+      "failed_generations": 2,
+      "invalid_qa_pairs": 1
+    }
+  },
+  "qa_pairs": [
+    {
+      "question": "What is the main topic of inquiry in the given document?",
+      "answer": "AutoRAG project",
+      "document_id": "5eb614b0-f018-45cb-91cb-b86a42656b3d",
+      "metadata": {
+        "generated_at": "2025-12-29T09:26:30.767838",
+        "source_text_preview": "Tell me about AutoRAG , what is there in the project?..."
+      }
+    },
+    {
+      "question": "What kind of information is being sought about the AutoRAG project?",
+      "answer": "General information or details about what is in the project",
+      "document_id": "5eb614b0-f018-45cb-91cb-b86a42656b3d",
+      "metadata": {
+        "generated_at": "2025-12-29T09:26:30.767848",
+        "source_text_preview": "Tell me about AutoRAG , what is there in the project?..."
+      }
+    },
+    {
+      "question": "What project is being referenced for new feature ideas?",
+      "answer": "ChefClaude",
+      "document_id": "4c6e1d26-b79c-4861-8873-655799f7f5ae",
+      "metadata": {
+        "generated_at": "2025-12-29T09:26:31.386436",
+        "source_text_preview": "Can you give me some new feature Idea On ChefClaude Project based on the slides?..."
+      }
+    },
+    {
+      "question": "What is the main goal or context of generating new feature ideas for the project?",
+      "answer": "based on the slides",
+      "document_id": "4c6e1d26-b79c-4861-8873-655799f7f5ae",
+      "metadata": {
+        "generated_at": "2025-12-29T09:26:31.386442",
+        "source_text_preview": "Can you give me some new feature Idea On ChefClaude Project based on the slides?..."
+      }
+    },
+    {
+      "question": "What is the name of the system mentioned in the document?",
+      "answer": "AutoRAG",
+      "document_id": "a3f2a693-db00-4195-9099-8f43bcfdf7b6",
+      "metadata": {
+        "generated_at": "2025-12-29T09:26:31.616292",
+        "source_text_preview": "AutoRAG..."
+      }
+    },
+    {
+      "question": "What is the main topic of the document?",
+      "answer": "AutoRAG",
+      "document_id": "a3f2a693-db00-4195-9099-8f43bcfdf7b6",
+      "metadata": {
+        "generated_at": "2025-12-29T09:26:31.616306",
+        "source_text_preview": "AutoRAG..."
+      }
+    },
+    {
+      "question": "What are the first words written in this conversation?",
+      "answer": "Tell me the first words i wrote in this coversation",
+      "document_id": "49d2598c-cf2d-4e21-acde-58db3ff3df2a",
+      "metadata": {
+        "generated_at": "2025-12-29T09:26:32.249190",
+        "source_text_preview": "Tell me the first words i wrote in this coversation..."
+      }
+    }
+  ]
+}
