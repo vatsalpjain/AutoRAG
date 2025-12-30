@@ -14,6 +14,7 @@ from rich.table import Table
 
 from autorag.rag.pipeline import RAGPipeline
 from autorag.evaluation.ragas_eval import RagasEvaluator
+import time
 
 # Initialize Rich console for terminal output
 console = Console()
@@ -114,6 +115,11 @@ class GridSearchOptimizer:
                 self.results.append(result)
                 
                 progress.update(main_task, advance=1)
+                
+                # Add delay between configs to prevent rate limiting
+                # 60 seconds ensures we stay well under 90 RPM across configs
+                if config != configurations[-1]:  # Don't delay after last config
+                    time.sleep(60)
         
         # Sort by weighted score (best first)
         self.results.sort(key=lambda x: x["weighted_score"], reverse=True)
@@ -196,7 +202,7 @@ class GridSearchOptimizer:
             avg_tokens = 0.0
             avg_latency = 0.0
         
-        # Evaluate using Ragas (batch evaluation)
+        # Evaluate using Ragas (ONE-BY-ONE to prevent rate limit bursts)
         ragas_scores = {}
         if self.ragas_evaluator and successful_queries > 0:
             try:
@@ -204,31 +210,37 @@ class GridSearchOptimizer:
                 if progress and task_id:
                     progress.update(task_id, description=f"Testing {config['name']} - Ragas evaluation...")
                 
-                # Prepare dataset for Ragas
-                dataset = self.ragas_evaluator.prepare_dataset(qa_pairs, rag_results)
-                
-                # Run Ragas evaluation (suppress its tqdm progress bars to avoid interference)
+                # Evaluate ONE question at a time to add delays between batches
                 import os
-                os.environ['RAGAS_DO_NOT_TRACK'] = 'true'  # Disable Ragas tracking
+                os.environ['RAGAS_DO_NOT_TRACK'] = 'true'
                 
-                # Temporarily redirect tqdm output to avoid conflicts with Rich
-                from io import StringIO
-                import sys
-                original_stderr = sys.stderr
-                sys.stderr = StringIO()  # Suppress tqdm progress bars
+                all_metric_scores = {"answer_relevancy": [], "faithfulness": [], "answer_similarity": []}
                 
-                ragas_results = self.ragas_evaluator.evaluate(dataset)
+                # Process each Q&A pair individually
+                for i, (qa_pair, rag_result) in enumerate(zip(qa_pairs, rag_results)):
+                    # Prepare single-question dataset
+                    dataset = self.ragas_evaluator.prepare_dataset([qa_pair], [rag_result])
+                    
+                    # Suppress tqdm for cleaner output
+                    from io import StringIO
+                    import sys
+                    original_stderr = sys.stderr
+                    sys.stderr = StringIO()
+                    
+                    # Evaluate this one question
+                    result = self.ragas_evaluator.evaluate(dataset)
+                    
+                    sys.stderr = original_stderr
+                    
+                    # Collect metric scores
+                    for metric in all_metric_scores.keys():
+                        if metric in result:
+                            all_metric_scores[metric].append(result[metric])
                 
-                # Restore stderr
-                sys.stderr = original_stderr
-                
-                # Extract individual metric scores
+                # Average all metric scores across questions
                 ragas_scores = {
-                    "answer_relevancy": ragas_results.get("answer_relevancy", 0.0),
-                    "faithfulness": ragas_results.get("faithfulness", 0.0),
-                    "context_precision": ragas_results.get("context_precision", 0.0),
-                    "context_recall": ragas_results.get("context_recall", 0.0),
-                    "answer_similarity": ragas_results.get("answer_similarity", 0.0)
+                    metric: sum(scores) / len(scores) if scores else 0.0
+                    for metric, scores in all_metric_scores.items()
                 }
                 
                 # Calculate aggregate Ragas score
@@ -262,8 +274,6 @@ class GridSearchOptimizer:
                 # Ragas metric breakdown (if available)
                 "ragas_answer_relevancy": ragas_scores.get("answer_relevancy", None),
                 "ragas_faithfulness": ragas_scores.get("faithfulness", None),
-                "ragas_context_precision": ragas_scores.get("context_precision", None),
-                "ragas_context_recall": ragas_scores.get("context_recall", None),
                 "ragas_answer_similarity": ragas_scores.get("answer_similarity", None)
             },
             "scores": {

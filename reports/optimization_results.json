@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "timestamp": "2025-12-28T19:34:12.735551",
+    "timestamp": "2025-12-30T13:43:18.082683",
     "total_configs_tested": 5,
     "best_config": {
       "top_k": 3,
@@ -16,23 +16,21 @@
         "name": "k3_t0.3"
       },
       "metrics": {
-        "accuracy": 0.5,
-        "avg_tokens": 138.5,
-        "avg_latency_seconds": 0.8690345585346222,
+        "accuracy": NaN,
+        "avg_tokens": 285.25,
+        "avg_latency_seconds": 2.6934123933315277,
         "successful_queries": 8,
         "total_queries": 8,
-        "ragas_answer_relevancy": null,
-        "ragas_faithfulness": null,
-        "ragas_context_precision": null,
-        "ragas_context_recall": null,
-        "ragas_answer_similarity": null
+        "ragas_answer_relevancy": NaN,
+        "ragas_faithfulness": NaN,
+        "ragas_answer_similarity": 0.29899244659375346
       },
       "scores": {
-        "accuracy_score": 0.5,
-        "cost_score": 0.8783487044356609,
-        "latency_score": 1.0319549402987278
+        "accuracy_score": NaN,
+        "cost_score": 0.7780587434351294,
+        "latency_score": 0.35798509464166967
       },
-      "weighted_score": 0.5
+      "weighted_score": NaN
     },
     {
       "config": {
@@ -41,23 +39,21 @@
         "name": "k3_t0.7"
       },
       "metrics": {
-        "accuracy": 0.5,
-        "avg_tokens": 134.125,
-        "avg_latency_seconds": 7.908589690923691,
+        "accuracy": NaN,
+        "avg_tokens": 257.625,
+        "avg_latency_seconds": 2.72625133395195,
         "successful_queries": 8,
         "total_queries": 8,
-        "ragas_answer_relevancy": null,
-        "ragas_faithfulness": null,
-        "ragas_context_precision": null,
-        "ragas_context_recall": null,
-        "ragas_answer_similarity": null
+        "ragas_answer_relevancy": NaN,
+        "ragas_faithfulness": NaN,
+        "ragas_answer_similarity": 0.24876113916481626
       },
       "scores": {
-        "accuracy_score": 0.5,
-        "cost_score": 0.8817370219332084,
-        "latency_score": 0.12486593003176599
+        "accuracy_score": NaN,
+        "cost_score": 0.7951495875161515,
+        "latency_score": 0.35382557382173757
       },
-      "weighted_score": 0.5
+      "weighted_score": NaN
     },
     {
       "config": {
@@ -66,23 +62,21 @@
         "name": "k3_t1.0"
       },
       "metrics": {
-        "accuracy": 0.5,
-        "avg_tokens": 140.625,
-        "avg_latency_seconds": 1.4956150650978088,
+        "accuracy": NaN,
+        "avg_tokens": 303.875,
+        "avg_latency_seconds": 2.9378740787506104,
         "successful_queries": 8,
         "total_queries": 8,
-        "ragas_answer_relevancy": null,
-        "ragas_faithfulness": null,
-        "ragas_context_precision": null,
-        "ragas_context_recall": null,
-        "ragas_answer_similarity": null
+        "ragas_answer_relevancy": NaN,
+        "ragas_faithfulness": NaN,
+        "ragas_answer_similarity": 0.324626082364081
       },
       "scores": {
-        "accuracy_score": 0.5,
-        "cost_score": 0.8767123287671232,
-        "latency_score": 0.6267175723480033
+        "accuracy_score": NaN,
+        "cost_score": 0.7669446841146582,
+        "latency_score": 0.3291775676269212
       },
-      "weighted_score": 0.5
+      "weighted_score": NaN
     },
     {
       "config": {
@@ -91,23 +85,21 @@
         "name": "k5_t0.3"
       },
       "metrics": {
-        "accuracy": 0.5,
-        "avg_tokens": 225.375,
-        "avg_latency_seconds": 1.4472849071025848,
+        "accuracy": NaN,
+        "avg_tokens": 499.375,
+        "avg_latency_seconds": 2.766288608312607,
         "successful_queries": 8,
         "total_queries": 8,
-        "ragas_answer_relevancy": null,
-        "ragas_faithfulness": null,
-        "ragas_context_precision": null,
-        "ragas_context_recall": null,
-        "ragas_answer_similarity": null
+        "ragas_answer_relevancy": NaN,
+        "ragas_faithfulness": NaN,
+        "ragas_answer_similarity": 0.33237480769923616
       },
       "scores": {
-        "accuracy_score": 0.5,
-        "cost_score": 0.8160767112108538,
-        "latency_score": 0.6462933848896517
+        "accuracy_score": NaN,
+        "cost_score": 0.6669445602334305,
+        "latency_score": 0.34888322030791696
       },
-      "weighted_score": 0.5
+      "weighted_score": NaN
     },
     {
       "config": {
@@ -116,23 +108,21 @@
         "name": "k5_t0.7"
       },
       "metrics": {
-        "accuracy": 0.5,
-        "avg_tokens": 227.125,
-        "avg_latency_seconds": 1.6226777732372284,
+        "accuracy": NaN,
+        "avg_tokens": 517.25,
+        "avg_latency_seconds": 2.865726202726364,
         "successful_queries": 8,
         "total_queries": 8,
-        "ragas_answer_relevancy": null,
-        "ragas_faithfulness": null,
-        "ragas_context_precision": null,
-        "ragas_context_recall": null,
-        "ragas_answer_similarity": null
+        "ragas_answer_relevancy": NaN,
+        "ragas_faithfulness": NaN,
+        "ragas_answer_similarity": 0.2925155302015279
       },
       "scores": {
-        "accuracy_score": 0.5,
-        "cost_score": 0.8149129061831517,
-        "latency_score": 0.5804916134262393
+        "accuracy_score": NaN,
+        "cost_score": 0.6590871642774757,
+        "latency_score": 0.3371855429812467
       },
-      "weighted_score": 0.5
+      "weighted_score": NaN
     }
   ]
 }

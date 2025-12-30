@@ -97,6 +97,10 @@ class APIKeysConfig(BaseModel):
 class OptimizationConfig(BaseModel):
     """Optimization settings."""
     
+    strategy: Literal["grid", "bayesian"] = Field(
+        default="grid",
+        description="Optimization strategy: 'grid' (exhaustive) or 'bayesian' (Optuna)"
+    )
     num_experiments: int = Field(
         default=20,
         ge=1,
@@ -105,9 +109,9 @@ class OptimizationConfig(BaseModel):
     )
     test_questions: int = Field(
         default=50,
-        ge=10,
+        ge=5,
         le=500,
-        description="Number of test questions to generate (10-500)"
+        description="Number of test questions to generate (5-500)"
     )
 
 

@@ -1,0 +1,23 @@
+# AutoRAG Configuration Template
+# Copy this to config.yaml and fill in your values
+
+# Database connection
+database:
+  type: supabase  # Options: supabase, mongodb, postgresql
+  url: 
+  key: 
+  table: 
+  text_column: content
+  id_column: id
+
+# API keys for external services
+api_keys:
+  groq: 
+  pinecone: 
+  pinecone_index: autorag
+
+# Optimization settings
+optimization:
+  strategy: grid       
+  num_experiments: 5
+  test_questions: 5

@@ -28,7 +28,8 @@ console = Console()
 @app.command()
 def optimize(
     experiments: int = typer.Option(None, "--experiments", "-e", help="Number of experiments to run (overrides config)"),
-    config_file: Path = typer.Option("config.yaml", "--config", "-c", help="Path to config file")
+    config_file: Path = typer.Option("config.yaml", "--config", "-c", help="Path to config file"),
+    run_async: bool = typer.Option(False, "--async", help="Run optimization in background (requires Celery worker)")
 ):
     """
     Run the RAG optimization process.
@@ -62,6 +63,38 @@ def optimize(
     
     # Override num_experiments from CLI flag if provided
     num_experiments = experiments if experiments else config.optimization.num_experiments
+    
+    # ========== ASYNC MODE: DISPATCH TO CELERY ==========
+    if run_async:
+        try:
+            from autorag.tasks.optimization_task import run_optimization
+            
+            console.print("\n[bold cyan]🚀 Async Mode Enabled[/bold cyan]")
+            console.print("  Dispatching optimization task to Celery worker...\n")
+            
+            # Dispatch task to Celery (non-blocking)
+            task = run_optimization.delay(
+                config_path=str(config_file),
+                num_experiments=num_experiments
+            )
+            
+            console.print(f"[green]✓[/green] Task dispatched successfully!")
+            console.print(f"  Task ID: [cyan]{task.id}[/cyan]")
+            console.print("\n[bold]Next Steps:[/bold]")
+            console.print("  1. Check progress: [cyan]autorag status[/cyan]")
+            console.print("  2. View results when complete: [cyan]autorag results[/cyan]")
+            console.print("\n[dim]Note: Ensure Celery worker is running:[/dim]")
+            console.print("  [dim]celery -A autorag.tasks.celery_app worker -Q autorag_tasks --loglevel=info[/dim]")
+            return  # Exit immediately, worker handles the rest
+            
+        except ImportError as e:
+            console.print(f"[bold red]❌ Celery not available:[/bold red] {e}")
+            console.print("[dim]Install with: pip install celery redis[/dim]")
+            raise typer.Exit(code=1)
+        except Exception as e:
+            console.print(f"[bold red]❌ Failed to dispatch async task:[/bold red] {e}")
+            console.print("[dim]Is Redis running? Try: docker-compose up -d redis[/dim]")
+            raise typer.Exit(code=1)
     
     # ========== DISPLAY CONFIGURATION ==========
     console.print("[bold cyan]📋 Configuration Summary[/bold cyan]")
@@ -273,25 +306,42 @@ def optimize(
     
     console.print("\n" + "─" * 60 + "\n")
     
-    # ========== RUN GRID SEARCH OPTIMIZATION ==========
-    console.print("[bold cyan]🔍 Running Grid Search Optimization[/bold cyan]")
+    # ========== RUN OPTIMIZATION (Grid or Bayesian based on config) ==========
+    strategy = config.optimization.strategy
     
     try:
-        # Initialize optimizer with existing pipeline and Groq key for Ragas
-        optimizer = GridSearchOptimizer(
-            pipeline=pipeline,
-            groq_api_key=config.api_keys.groq
-        )
+        if strategy == "bayesian":
+            console.print("[bold cyan]🧠 Running Bayesian Optimization (Optuna)[/bold cyan]")
+            from autorag.optimization.bayesian import BayesianOptimizer
+            
+            optimizer = BayesianOptimizer(
+                pipeline=pipeline,
+                groq_api_key=config.api_keys.groq
+            )
+            
+            console.print(f"  Running {num_experiments} trials with intelligent sampling...\n")
+            optimizer.optimize(
+                qa_pairs=qa_pairs,
+                n_trials=num_experiments,
+                show_progress=True
+            )
+            
+        else:  # Default: grid search
+            console.print("[bold cyan]🔍 Running Grid Search Optimization[/bold cyan]")
+            
+            optimizer = GridSearchOptimizer(
+                pipeline=pipeline,
+                groq_api_key=config.api_keys.groq
+            )
+            
+            console.print("  Testing multiple RAG configurations with Ragas evaluation...\n")
+            optimizer.optimize(
+                qa_pairs=qa_pairs,
+                max_configs=num_experiments if num_experiments <= 20 else 9,
+                show_progress=True
+            )
         
-        # Run optimization (test configurations)
-        console.print(f"  Testing multiple RAG configurations with Ragas evaluation...\n")
-        results = optimizer.optimize(
-            qa_pairs=qa_pairs,
-            max_configs=num_experiments if num_experiments <= 20 else 9,
-            show_progress=True
-        )
-        
-        # Save results to file
+        # Save results to file (common for both strategies)
         results_file = Path("reports/optimization_results.json")
         optimizer.save_results(output_path=results_file)
         
@@ -303,12 +353,10 @@ def optimize(
         
         # Show Ragas metric breakdown if available
         if best_config['metrics'].get('ragas_answer_relevancy') is not None:
-            console.print(f"\n  [bold]Ragas Metrics Breakdown:[/bold]")
-            console.print(f"    • Answer Relevancy: {best_config['metrics']['ragas_answer_relevancy']:.3f}")
-            console.print(f"    • Faithfulness: {best_config['metrics']['ragas_faithfulness']:.3f}")
-            console.print(f"    • Context Precision: {best_config['metrics']['ragas_context_precision']:.3f}")
-            console.print(f"    • Context Recall: {best_config['metrics']['ragas_context_recall']:.3f}")
-            console.print(f"    • Answer Similarity: {best_config['metrics']['ragas_answer_similarity']:.3f}")
+            console.print("\n  [bold]Ragas Metrics Breakdown:[/bold]")
+            console.print(f"    • Answer Relevancy (45%): {best_config['metrics']['ragas_answer_relevancy']:.3f}")
+            console.print(f"    • Faithfulness (35%): {best_config['metrics']['ragas_faithfulness']:.3f}")
+            console.print(f"    • Answer Similarity (20%): {best_config['metrics']['ragas_answer_similarity']:.3f}")
         
         console.print(f"\n  Avg Tokens: {best_config['metrics']['avg_tokens']:.0f}")
         console.print(f"  Latency: {best_config['metrics']['avg_latency_seconds']:.2f}s")
@@ -440,12 +488,10 @@ def results(
     # ========== SHOW RAGAS METRICS BREAKDOWN ==========
     if best['metrics'].get('ragas_answer_relevancy') is not None:
         console.print(f"\n  [bold]Ragas Metrics Breakdown:[/bold]")
-        console.print(f"    • Answer Relevancy (30%): [cyan]{best['metrics']['ragas_answer_relevancy']:.3f}[/cyan]")
-        console.print(f"    • Faithfulness (25%): [cyan]{best['metrics']['ragas_faithfulness']:.3f}[/cyan]")
-        console.print(f"    • Context Precision (15%): [cyan]{best['metrics']['ragas_context_precision']:.3f}[/cyan]")
-        console.print(f"    • Context Recall (15%): [cyan]{best['metrics']['ragas_context_recall']:.3f}[/cyan]")
-        console.print(f"    • Answer Similarity (15%): [cyan]{best['metrics']['ragas_answer_similarity']:.3f}[/cyan]")
-        console.print(f"\n    [dim]Note: Overall score is the weighted average of these Ragas metrics[/dim]")
+        console.print(f"    • Answer Relevancy (45%): [cyan]{best['metrics']['ragas_answer_relevancy']:.3f}[/cyan]")
+        console.print(f"    • Faithfulness (35%): [cyan]{best['metrics']['ragas_faithfulness']:.3f}[/cyan]")
+        console.print(f"    • Answer Similarity (20%): [cyan]{best['metrics']['ragas_answer_similarity']:.3f}[/cyan]")
+        console.print(f"\n    [dim]Note: Overall score is the weighted average of these 3 Ragas metrics[/dim]")
     else:
         console.print(f"\n  [dim]Individual Ragas metrics not available (fallback mode used)[/dim]")
     
@@ -501,13 +547,11 @@ def _format_ragas_breakdown_html(metrics: Dict[str, Any]) -> str:
         return f"""
         <p><strong>Ragas Metrics Breakdown:</strong></p>
         <ul>
-            <li>Answer Relevancy (30%): {metrics['ragas_answer_relevancy']:.3f}</li>
-            <li>Faithfulness (25%): {metrics['ragas_faithfulness']:.3f}</li>
-            <li>Context Precision (15%): {metrics['ragas_context_precision']:.3f}</li>
-            <li>Context Recall (15%): {metrics['ragas_context_recall']:.3f}</li>
-            <li>Answer Similarity (15%): {metrics['ragas_answer_similarity']:.3f}</li>
+            <li>Answer Relevancy (45%): {metrics['ragas_answer_relevancy']:.3f}</li>
+            <li>Faithfulness (35%): {metrics['ragas_faithfulness']:.3f}</li>
+            <li>Answer Similarity (20%): {metrics['ragas_answer_similarity']:.3f}</li>
         </ul>
-        <p><em>Note: Overall score is the weighted average of these Ragas metrics</em></p>
+        <p><em>Note: Overall score is the weighted average of these 3 Ragas metrics</em></p>
         """
     return "<p><em>Individual Ragas metrics not available</em></p>"
 
@@ -672,13 +716,92 @@ def status(
     - Estimated time remaining
     - Best configuration so far
     """
-    console.print("[bold cyan]Optimization Status[/bold cyan]\n")
+    from autorag.tasks.progress import ProgressTracker
+    from rich.progress import Progress, BarColumn, TextColumn, TaskProgressColumn
     
-    # TODO: Check Celery task status
-    # TODO: Display progress bar
-    # TODO: Show intermediate results
+    console.print(Panel.fit(
+        "[bold cyan]📊 Optimization Status[/bold cyan]",
+        subtitle="Background task progress"
+    ))
     
-    console.print("[yellow]⚠️  Not yet implemented[/yellow]")
+    # Load progress from file
+    tracker = ProgressTracker()
+    progress = tracker.load()
+    
+    if progress is None:
+        console.print("\n[yellow]⚠️  No optimization in progress[/yellow]")
+        console.print("[dim]Run 'autorag optimize --async' to start a background optimization[/dim]")
+        return
+    
+    # Display task info
+    console.print(f"\n[bold]Task ID:[/bold] [cyan]{progress.task_id}[/cyan]")
+    console.print(f"[bold]Status:[/bold] ", end="")
+    
+    # Color-coded status
+    if progress.status == "running":
+        console.print("[blue]🔄 Running[/blue]")
+    elif progress.status == "completed":
+        console.print("[green]✅ Completed[/green]")
+    elif progress.status == "failed":
+        console.print("[red]❌ Failed[/red]")
+    else:
+        console.print(f"[yellow]{progress.status}[/yellow]")
+    
+    # Timestamps
+    if progress.started_at:
+        console.print(f"[bold]Started:[/bold] {progress.started_at}")
+    if progress.completed_at:
+        console.print(f"[bold]Completed:[/bold] {progress.completed_at}")
+    
+    console.print("\n" + "─" * 60 + "\n")
+    
+    # Progress bar
+    console.print(f"[bold]Current Step:[/bold] {progress.current_step}")
+    console.print(f"[bold]Progress:[/bold] {progress.percent_complete}%")
+    
+    # Visual progress bar using Rich
+    with Progress(
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(bar_width=40),
+        TaskProgressColumn(),
+        console=console,
+        transient=True
+    ) as progress_bar:
+        task = progress_bar.add_task("Optimization", total=100, completed=progress.percent_complete)
+        progress_bar.refresh()
+    
+    # Configs tested
+    if progress.total_configs > 0:
+        console.print(f"\n[bold]Configurations:[/bold] {progress.configs_tested}/{progress.total_configs} tested")
+    
+    # Best config so far
+    if progress.best_config_so_far:
+        console.print("\n" + "─" * 60)
+        console.print("\n[bold green]🏆 Best Configuration So Far[/bold green]")
+        config = progress.best_config_so_far
+        
+        if isinstance(config, dict):
+            if "config" in config:
+                console.print(f"  Name: [cyan]{config['config'].get('name', 'N/A')}[/cyan]")
+                console.print(f"  top_k: {config['config'].get('top_k', 'N/A')}")
+                console.print(f"  temperature: {config['config'].get('temperature', 'N/A')}")
+            if "metrics" in config:
+                console.print(f"  Accuracy: [green]{config['metrics'].get('accuracy', 0):.3f}[/green]")
+            if "weighted_score" in config:
+                console.print(f"  Weighted Score: [green]{config.get('weighted_score', 0):.3f}[/green]")
+    
+    # Error message if failed
+    if progress.status == "failed" and progress.error_message:
+        console.print("\n" + "─" * 60)
+        console.print("\n[bold red]Error Details:[/bold red]")
+        console.print(f"  {progress.error_message}")
+    
+    # Next steps
+    console.print("\n" + "─" * 60 + "\n")
+    if progress.status == "running":
+        console.print("[bold]💡 Tip:[/bold] Run 'autorag status' again to see updated progress")
+    elif progress.status == "completed":
+        console.print("[bold]Next:[/bold] Run 'autorag results' to see full results")
 
 
 # Entry point for the CLI

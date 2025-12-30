@@ -60,7 +60,7 @@
 <body>
     <div class="header">
         <h1>🎯 AutoRAG Optimization Report</h1>
-        <p>Generated: 2025-12-28T19:34:12.735551</p>
+        <p>Generated: 2025-12-30T13:43:18.082683</p>
         <p>Configurations Tested: 5</p>
     </div>
     
@@ -68,10 +68,19 @@
         <h2>🏆 Best Configuration</h2>
         <p><strong>Name:</strong> k3_t0.3</p>
         <p><strong>Parameters:</strong> top_k=3, temperature=0.3</p>
-        <p><strong>Weighted Score:</strong> <span class="score">0.500</span></p>
-        <p><strong>Accuracy:</strong> 0.500</p>
-        <p><strong>Avg Tokens:</strong> 138</p>
-        <p><strong>Latency:</strong> 0.87s</p>
+        <p><strong>Overall Score (Ragas Aggregate):</strong> <span class="score">nan</span></p>
+        <p><strong>Ragas Aggregate Score:</strong> nan</p>
+        
+        <p><strong>Ragas Metrics Breakdown:</strong></p>
+        <ul>
+            <li>Answer Relevancy (45%): nan</li>
+            <li>Faithfulness (35%): nan</li>
+            <li>Answer Similarity (20%): 0.299</li>
+        </ul>
+        <p><em>Note: Overall score is the weighted average of these 3 Ragas metrics</em></p>
+        
+        <p><strong>Avg Tokens:</strong> 285</p>
+        <p><strong>Latency:</strong> 2.69s</p>
     </div>
     
     <div class="metric-card">
@@ -81,10 +90,10 @@
                 <tr>
                     <th>Rank</th>
                     <th>Config</th>
-                    <th>Accuracy</th>
+                    <th>Ragas Score</th>
                     <th>Avg Tokens</th>
                     <th>Latency (s)</th>
-                    <th>Score</th>
+                    <th>Overall Score</th>
                 </tr>
             </thead>
             <tbody>
@@ -92,46 +101,46 @@
                 <tr class="best-config">
                     <td>#1</td>
                     <td>k3_t0.3<br><small>k=3, t=0.3</small></td>
-                    <td>0.500</td>
-                    <td>138</td>
-                    <td>0.87</td>
-                    <td><strong>0.500</strong></td>
+                    <td>nan</td>
+                    <td>285</td>
+                    <td>2.69</td>
+                    <td><strong>nan</strong></td>
                 </tr>
 
                 <tr class="">
                     <td>#2</td>
                     <td>k3_t0.7<br><small>k=3, t=0.7</small></td>
-                    <td>0.500</td>
-                    <td>134</td>
-                    <td>7.91</td>
-                    <td><strong>0.500</strong></td>
+                    <td>nan</td>
+                    <td>258</td>
+                    <td>2.73</td>
+                    <td><strong>nan</strong></td>
                 </tr>
 
                 <tr class="">
                     <td>#3</td>
                     <td>k3_t1.0<br><small>k=3, t=1.0</small></td>
-                    <td>0.500</td>
-                    <td>141</td>
-                    <td>1.50</td>
-                    <td><strong>0.500</strong></td>
+                    <td>nan</td>
+                    <td>304</td>
+                    <td>2.94</td>
+                    <td><strong>nan</strong></td>
                 </tr>
 
                 <tr class="">
                     <td>#4</td>
                     <td>k5_t0.3<br><small>k=5, t=0.3</small></td>
-                    <td>0.500</td>
-                    <td>225</td>
-                    <td>1.45</td>
-                    <td><strong>0.500</strong></td>
+                    <td>nan</td>
+                    <td>499</td>
+                    <td>2.77</td>
+                    <td><strong>nan</strong></td>
                 </tr>
 
                 <tr class="">
                     <td>#5</td>
                     <td>k5_t0.7<br><small>k=5, t=0.7</small></td>
-                    <td>0.500</td>
-                    <td>227</td>
-                    <td>1.62</td>
-                    <td><strong>0.500</strong></td>
+                    <td>nan</td>
+                    <td>517</td>
+                    <td>2.87</td>
+                    <td><strong>nan</strong></td>
                 </tr>
 
             </tbody>
