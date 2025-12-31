@@ -7,11 +7,33 @@ from typing import Dict, Any
 
 from autorag.tasks.celery_app import app
 from autorag.tasks.progress import ProgressTracker
-from autorag.utils.config import load_config
+from autorag.utils.config import load_config, DatabaseConfig
 from autorag.database.supabase import SupabaseConnector
+from autorag.database.mongodb import MongoDBConnector
+from autorag.database.postgres import PostgreSQLConnector
 from autorag.rag.pipeline import RAGPipeline
 from autorag.synthetic.generator import SyntheticQAGenerator
 from autorag.optimization.grid_search import GridSearchOptimizer
+
+
+def get_connector(config: DatabaseConfig):
+    """
+    Factory function to get the appropriate database connector.
+    
+    Args:
+        config: DatabaseConfig with 'type' field
+        
+    Returns:
+        Database connector instance (Supabase, MongoDB, or PostgreSQL)
+    """
+    if config.type == "supabase":
+        return SupabaseConnector(config)
+    elif config.type == "mongodb":
+        return MongoDBConnector(config)
+    elif config.type == "postgresql":
+        return PostgreSQLConnector(config)
+    else:
+        raise ValueError(f"Unsupported database type: {config.type}")
 
 
 @app.task(bind=True, name="autorag.optimize")
@@ -43,15 +65,13 @@ def run_optimization(self, config_path: str = "config.yaml", num_experiments: in
         # ========== STEP 2: CONNECT TO DATABASE (10%) ==========
         tracker.update(current_step="Connecting to database", percent_complete=10)
         
-        if config.database.type != "supabase":
-            raise ValueError(f"Database type '{config.database.type}' not yet supported")
-        
-        connector = SupabaseConnector(config.database)
+        # Use factory function to get the appropriate connector (supports all 3 database types)
+        connector = get_connector(config.database)
         connector.test_connection()
         
         doc_count = connector.count_documents()
         if doc_count == 0:
-            raise ValueError(f"No documents found in table '{config.database.table}'")
+            raise ValueError("No documents found in database")
         
         # ========== STEP 3: FETCH DOCUMENTS (15%) ==========
         tracker.update(current_step="Fetching documents", percent_complete=15)

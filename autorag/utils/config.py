@@ -18,6 +18,10 @@ class DatabaseConfig(BaseModel):
     # Supabase fields
     url: Optional[str] = None
     key: Optional[str] = None
+    # Storage bucket fields (new - for file-based storage)
+    bucket: Optional[str] = Field(default="pdf", description="Supabase Storage bucket name")
+    folder: Optional[str] = Field(default="pdf", description="Folder path within bucket")
+    # Table fields (legacy - for table-based storage)
     table: Optional[str] = None
     text_column: Optional[str] = Field(default="content", description="Column containing document text")
     id_column: Optional[str] = Field(default="id", description="Column containing unique identifier")

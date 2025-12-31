@@ -13,7 +13,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 from rich.table import Table
 
 from autorag.rag.pipeline import RAGPipeline
-from autorag.evaluation.ragas_eval import RagasEvaluator
+from autorag.evaluation.autorag_eval import AutoRAGEvaluator
 import time
 
 # Initialize Rich console for terminal output
@@ -36,7 +36,7 @@ class GridSearchOptimizer:
         """
         self.pipeline = pipeline
         self.results = []
-        self.ragas_evaluator = RagasEvaluator(groq_api_key) if groq_api_key else None
+        self.evaluator = AutoRAGEvaluator(groq_api_key) if groq_api_key else None
     
     def define_search_space(self) -> List[Dict[str, Any]]:
         """
@@ -95,7 +95,8 @@ class GridSearchOptimizer:
             BarColumn(),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             console=console,
-            disable=not show_progress
+            disable=not show_progress,
+            refresh_per_second=2  # Keep spinner animated during LLM calls
         ) as progress:
             
             main_task = progress.add_task(
@@ -115,11 +116,6 @@ class GridSearchOptimizer:
                 self.results.append(result)
                 
                 progress.update(main_task, advance=1)
-                
-                # Add delay between configs to prevent rate limiting
-                # 60 seconds ensures we stay well under 90 RPM across configs
-                if config != configurations[-1]:  # Don't delay after last config
-                    time.sleep(60)
         
         # Sort by weighted score (best first)
         self.results.sort(key=lambda x: x["weighted_score"], reverse=True)
@@ -202,66 +198,57 @@ class GridSearchOptimizer:
             avg_tokens = 0.0
             avg_latency = 0.0
         
-        # Evaluate using Ragas (ONE-BY-ONE to prevent rate limit bursts)
-        ragas_scores = {}
-        if self.ragas_evaluator and successful_queries > 0:
+        # Evaluate using AutoRAGEvaluator
+        eval_scores = {}
+        if self.evaluator and successful_queries > 0:
             try:
-                # Update progress to show Ragas evaluation stage
+                # Update progress to show evaluation stage
                 if progress and task_id:
-                    progress.update(task_id, description=f"Testing {config['name']} - Ragas evaluation...")
+                    progress.update(task_id, description=f"Testing {config['name']} - Evaluating...")
                 
-                # Evaluate ONE question at a time to add delays between batches
-                import os
-                os.environ['RAGAS_DO_NOT_TRACK'] = 'true'
+                # Collect scores for each Q&A pair
+                all_scores = {"answer_relevancy": [], "faithfulness": [], "answer_similarity": [], "context_recall": []}
                 
-                all_metric_scores = {"answer_relevancy": [], "faithfulness": [], "answer_similarity": []}
+                for qa_pair, rag_result in zip(qa_pairs, rag_results):
+                    # Build context string
+                    context = " ".join([doc["text"] for doc in rag_result.get("retrieved_docs", [])])
+                    
+                    # Evaluate single pair
+                    scores = self.evaluator.evaluate(
+                        question=qa_pair["question"],
+                        answer=rag_result["answer"],
+                        context=context,
+                        reference=qa_pair["answer"]
+                    )
+                    
+                    # Collect scores
+                    for metric, value in scores.items():
+                        if metric in all_scores and value is not None:
+                            all_scores[metric].append(value)
                 
-                # Process each Q&A pair individually
-                for i, (qa_pair, rag_result) in enumerate(zip(qa_pairs, rag_results)):
-                    # Prepare single-question dataset
-                    dataset = self.ragas_evaluator.prepare_dataset([qa_pair], [rag_result])
-                    
-                    # Suppress tqdm for cleaner output
-                    from io import StringIO
-                    import sys
-                    original_stderr = sys.stderr
-                    sys.stderr = StringIO()
-                    
-                    # Evaluate this one question
-                    result = self.ragas_evaluator.evaluate(dataset)
-                    
-                    sys.stderr = original_stderr
-                    
-                    # Collect metric scores
-                    for metric in all_metric_scores.keys():
-                        if metric in result:
-                            all_metric_scores[metric].append(result[metric])
-                
-                # Average all metric scores across questions
-                ragas_scores = {
-                    metric: sum(scores) / len(scores) if scores else 0.0
-                    for metric, scores in all_metric_scores.items()
+                # Average scores across all questions
+                eval_scores = {
+                    metric: sum(values) / len(values) if values else 0.0
+                    for metric, values in all_scores.items()
                 }
                 
-                # Calculate aggregate Ragas score
-                avg_accuracy = self.ragas_evaluator.calculate_aggregate_score(ragas_scores)
+                # Calculate aggregate score
+                avg_accuracy = self.evaluator.calculate_aggregate_score(eval_scores)
                 
             except Exception as e:
-                console.print(f"[yellow]⚠️  Ragas evaluation failed: {e}[/yellow]")
-                console.print(f"[dim]Falling back to simple similarity...[/dim]")
-                avg_accuracy = 0.5  # Fallback score
+                console.print(f"[yellow]⚠️  Evaluation failed: {e}[/yellow]")
+                console.print(f"[dim]Using fallback score...[/dim]")
+                avg_accuracy = 0.5
         else:
-            # No Ragas evaluator - use fallback
+            # No evaluator - use fallback
             avg_accuracy = 0.5
         
-        # Use Ragas aggregate score as primary ranking metric
-        # Cost and latency are tracked for info, but don't affect ranking
-        # (they depend on LLM/infrastructure, not RAG config quality)
-        weighted_score = avg_accuracy  # Pure Ragas aggregate score
+        # Use aggregate score as primary ranking metric
+        weighted_score = avg_accuracy
         
-        # Calculate cost/latency scores for reference only
-        cost_score = 1.0 / (avg_tokens / 1000 + 1)  # Normalize by 1k tokens
-        latency_score = 1.0 / (avg_latency + 0.1)  # Normalize by seconds
+        # Calculate cost/latency scores for reference
+        cost_score = 1.0 / (avg_tokens / 1000 + 1)
+        latency_score = 1.0 / (avg_latency + 0.1)
         
         return {
             "config": config,
@@ -271,10 +258,11 @@ class GridSearchOptimizer:
                 "avg_latency_seconds": avg_latency,
                 "successful_queries": successful_queries,
                 "total_queries": len(qa_pairs),
-                # Ragas metric breakdown (if available)
-                "ragas_answer_relevancy": ragas_scores.get("answer_relevancy", None),
-                "ragas_faithfulness": ragas_scores.get("faithfulness", None),
-                "ragas_answer_similarity": ragas_scores.get("answer_similarity", None)
+                # Metric breakdown
+                "answer_relevancy": eval_scores.get("answer_relevancy"),
+                "faithfulness": eval_scores.get("faithfulness"),
+                "answer_similarity": eval_scores.get("answer_similarity"),
+                "context_recall": eval_scores.get("context_recall")
             },
             "scores": {
                 "accuracy_score": avg_accuracy,

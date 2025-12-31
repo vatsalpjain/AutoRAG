@@ -10,11 +10,35 @@ from rich.panel import Panel
 from pathlib import Path
 from typing import Dict, Any
 
-from autorag.utils.config import load_config
+from autorag.utils.config import load_config, DatabaseConfig
+from autorag.utils.text_utils import chunk_documents, sample_chunks_for_qa
 from autorag.database.supabase import SupabaseConnector
+from autorag.database.mongodb import MongoDBConnector
+from autorag.database.postgres import PostgreSQLConnector
 from autorag.rag.pipeline import RAGPipeline
 from autorag.synthetic.generator import SyntheticQAGenerator
 from autorag.optimization.grid_search import GridSearchOptimizer
+
+
+def get_connector(config: DatabaseConfig):
+    """
+    Factory function to get the appropriate database connector.
+    
+    Args:
+        config: DatabaseConfig with 'type' field
+        
+    Returns:
+        Database connector instance (Supabase, MongoDB, or PostgreSQL)
+    """
+    if config.type == "supabase":
+        return SupabaseConnector(config)
+    elif config.type == "mongodb":
+        return MongoDBConnector(config)
+    elif config.type == "postgresql":
+        return PostgreSQLConnector(config)
+    else:
+        raise ValueError(f"Unsupported database type: {config.type}")
+
 
 # Initialize Typer app and Rich console for beautiful terminal output
 app = typer.Typer(
@@ -127,14 +151,8 @@ def optimize(
     console.print("[bold cyan]🔌 Connecting to Database[/bold cyan]")
     
     try:
-        # Only Supabase supported for now
-        if config.database.type != "supabase":
-            console.print(f"[bold red]❌ Database type '{config.database.type}' not yet supported[/bold red]")
-            console.print("[dim]Currently only Supabase is supported. MongoDB and PostgreSQL coming soon.[/dim]")
-            raise typer.Exit(code=1)
-        
-        # Create connector
-        connector = SupabaseConnector(config.database)
+        # Create connector using factory function (supports all 3 database types)
+        connector = get_connector(config.database)
         
         # Test connection
         console.print("  Testing connection...", end=" ")
@@ -143,11 +161,11 @@ def optimize(
         
         # Count documents
         doc_count = connector.count_documents()
-        console.print(f"  Total documents in table: [yellow]{doc_count}[/yellow]")
+        console.print(f"  Total documents: [yellow]{doc_count}[/yellow]")
         
         if doc_count == 0:
-            console.print("[bold red]❌ No documents found in table[/bold red]")
-            console.print(f"[dim]Please add documents to '{config.database.table}' table[/dim]")
+            console.print("[bold red]❌ No documents found[/bold red]")
+            console.print("[dim]Please add documents to your database[/dim]")
             raise typer.Exit(code=1)
         
     except Exception as e:
@@ -266,17 +284,26 @@ def optimize(
     console.print("[bold cyan]📝 Generating Synthetic Q&A Pairs[/bold cyan]")
     
     try:
-        # Initialize Q&A generator (no model_name needed - wrapper handles rotation)
+        # Step 1: Chunk documents for diverse Q&A coverage
+        console.print("  Chunking documents for diversity...", end=" ")
+        all_chunks = chunk_documents(documents, chunk_size=500, chunk_overlap=50)
+        console.print(f"[green]✓[/green] Created {len(all_chunks)} chunks")
+        
+        # Step 2: Randomly sample chunks for Q&A (ensures diversity)
+        target_questions = config.optimization.test_questions
+        sampled_chunks = sample_chunks_for_qa(all_chunks, target_questions, questions_per_chunk=1)
+        console.print(f"  Randomly sampled {len(sampled_chunks)} chunks for Q&A generation")
+        
+        # Step 3: Initialize Q&A generator
         qa_generator = SyntheticQAGenerator(
             groq_api_key=config.api_keys.groq,
-            questions_per_doc=2,  # Generate 2 questions per document
+            questions_per_doc=1,  # 1 question per chunk (already sampled)
             temperature=0.8  # Higher temperature for diverse questions
         )
         
-        # Generate Q&A pairs
-        target_questions = config.optimization.test_questions
+        # Step 4: Generate Q&A pairs from sampled chunks
         qa_pairs = qa_generator.generate(
-            documents=documents,
+            documents=sampled_chunks,  # Pass chunks as "documents"
             target_count=target_questions,
             show_progress=True
         )
@@ -295,7 +322,7 @@ def optimize(
         # Show statistics
         stats = qa_generator.get_statistics()
         console.print(f"\n  [bold]Generation Statistics:[/bold]")
-        console.print(f"    Total documents processed: {stats['total_documents']}")
+        console.print(f"    Total chunks used: {stats['total_documents']}")
         console.print(f"    Total questions generated: {stats['total_questions']}")
         if stats['failed_generations'] > 0:
             console.print(f"    Failed generations: [yellow]{stats['failed_generations']}[/yellow]")

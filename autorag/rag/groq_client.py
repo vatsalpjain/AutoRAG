@@ -97,6 +97,9 @@ class GroqMultiModelClient:
                 # Rotate to next model for true round-robin
                 self._rotate_model()
                 
+                # Proactive delay to prevent rate limits (1 sec between calls)
+                time.sleep(1.0)
+                
                 return response
                 
             except RateLimitError as e:

@@ -12,13 +12,55 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 
 from autorag.rag.pipeline import RAGPipeline
-from autorag.evaluation.ragas_eval import RagasEvaluator
+from autorag.evaluation.autorag_eval import AutoRAGEvaluator
 
 # Initialize Rich console for terminal output
 console = Console()
 
 # Suppress Optuna's default logging (we use Rich for output)
 optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+
+class EarlyStoppingCallback:
+    """
+    Optuna callback that stops optimization when score stops improving.
+    Saves LLM calls by stopping early when convergence is detected.
+    """
+    
+    def __init__(self, patience: int = 3, min_trials: int = 5):
+        """
+        Initialize early stopping.
+        
+        Args:
+            patience: Stop if no improvement for this many consecutive trials
+            min_trials: Minimum trials before early stopping kicks in
+        """
+        self.patience = patience
+        self.min_trials = min_trials
+        self.best_value = float('-inf')
+        self.trials_without_improvement = 0
+    
+    def __call__(self, study: optuna.Study, trial: optuna.Trial) -> None:
+        """Called after each trial. Raises StopIteration to stop optimization."""
+        current_best = study.best_value
+        
+        # Skip early stopping for first few trials (exploration phase)
+        if len(study.trials) < self.min_trials:
+            return
+        
+        # Check if improved
+        if current_best > self.best_value:
+            self.best_value = current_best
+            self.trials_without_improvement = 0
+            console.print(f"  [green]↑ New best: {current_best:.3f}[/green]")
+        else:
+            self.trials_without_improvement += 1
+            console.print(f"  [dim]No improvement ({self.trials_without_improvement}/{self.patience})[/dim]")
+        
+        # Stop if patience exceeded
+        if self.trials_without_improvement >= self.patience:
+            console.print(f"\n[yellow]⚡ Early stopping! No improvement for {self.patience} trials.[/yellow]")
+            study.stop()
 
 
 class BayesianOptimizer:
@@ -38,7 +80,7 @@ class BayesianOptimizer:
         self.pipeline = pipeline
         self.results = []
         self.study = None  # Optuna study object
-        self.ragas_evaluator = RagasEvaluator(groq_api_key) if groq_api_key else None
+        self.evaluator = AutoRAGEvaluator(groq_api_key) if groq_api_key else None
         
         # Will be set during optimize()
         self._qa_pairs = None
@@ -73,14 +115,17 @@ class BayesianOptimizer:
             console.print(f"\n[bold cyan]🧠 Running Bayesian Optimization (Optuna)[/bold cyan]")
             console.print(f"  Maximum trials: {n_trials}")
             console.print(f"  Evaluating on {len(qa_pairs)} Q&A pairs")
-            console.print(f"  Search space: top_k ∈ [3, 10], temperature ∈ [0.1, 1.0]\n")
+            console.print(f"  Search space: top_k ∈ [3,7,10], temperature ∈ [0.3,0.7,1.0]\n")
         
-        # Create Optuna study (maximize RAGAS score)
+        # Create Optuna study (maximize score)
         self.study = optuna.create_study(
             direction="maximize",
             study_name="autorag_optimization",
             sampler=optuna.samplers.TPESampler(seed=42)  # Tree-structured Parzen Estimator
         )
+        
+        # Early stopping callback - stops if no improvement for 3 trials
+        early_stop_callback = EarlyStoppingCallback(patience=3, min_trials=5)
         
         # Run optimization with progress bar
         with Progress(
@@ -89,7 +134,8 @@ class BayesianOptimizer:
             BarColumn(),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             console=console,
-            disable=not show_progress
+            disable=not show_progress,
+            refresh_per_second=2  # Keep spinner animated during LLM calls
         ) as progress:
             
             self._progress = progress
@@ -98,10 +144,11 @@ class BayesianOptimizer:
                 total=n_trials
             )
             
-            # Run Optuna optimization
+            # Run Optuna optimization with early stopping
             self.study.optimize(
                 self._objective,
                 n_trials=n_trials,
+                callbacks=[early_stop_callback],
                 show_progress_bar=False  # We use Rich instead
             )
         
@@ -129,9 +176,10 @@ class BayesianOptimizer:
         """
         self._trial_count += 1
         
-        # Optuna suggests parameters to try
-        top_k = trial.suggest_int("top_k", 3, 10)
-        temperature = trial.suggest_float("temperature", 0.1, 1.0)
+        # Optuna suggests parameters from SAME search space as Grid Search
+        # Uses categorical suggestions for fair comparison
+        top_k = trial.suggest_categorical("top_k", [3, 5, 10])
+        temperature = trial.suggest_categorical("temperature", [0.3, 0.7, 1.0])
         
         # Create config dict
         config = {
@@ -151,11 +199,6 @@ class BayesianOptimizer:
         # Evaluate this configuration
         result = self._evaluate_config(config)
         self.results.append(result)
-        
-        # Add delay between configs to prevent rate limiting
-        # 60 seconds ensures we stay well under 90 RPM across configs
-        if self._trial_count < self._total_trials:
-            time.sleep(60)
         
         # Return score for Optuna to maximize
         return result["weighted_score"]
@@ -218,39 +261,41 @@ class BayesianOptimizer:
         avg_tokens = total_tokens / successful_queries if successful_queries > 0 else 0.0
         avg_latency = total_latency / successful_queries if successful_queries > 0 else 0.0
         
-        # Evaluate using Ragas
-        ragas_scores = {}
+        # Evaluate using AutoRAGEvaluator
+        eval_scores = {}
         avg_accuracy = 0.5  # Default fallback
         
-        if self.ragas_evaluator and successful_queries > 0:
+        if self.evaluator and successful_queries > 0:
             try:
-                import os
-                os.environ['RAGAS_DO_NOT_TRACK'] = 'true'
+                all_scores = {"answer_relevancy": [], "faithfulness": [], "answer_similarity": [], "context_recall": []}
                 
-                all_metric_scores = {"answer_relevancy": [], "faithfulness": [], "answer_similarity": []}
-                
-                # Process each Q&A pair individually
-                for i, (qa_pair, rag_result) in enumerate(zip(self._qa_pairs, rag_results)):
-                    dataset = self.ragas_evaluator.prepare_dataset([qa_pair], [rag_result])
+                for qa_pair, rag_result in zip(self._qa_pairs, rag_results):
+                    # Build context string
+                    context = " ".join([doc["text"] for doc in rag_result.get("retrieved_docs", [])])
                     
-                    # Evaluate (stderr NOT suppressed - see actual errors)
-                    result = self.ragas_evaluator.evaluate(dataset)
+                    # Evaluate single pair
+                    scores = self.evaluator.evaluate(
+                        question=qa_pair["question"],
+                        answer=rag_result["answer"],
+                        context=context,
+                        reference=qa_pair["answer"]
+                    )
                     
-                    # Collect metric scores
-                    for metric in all_metric_scores.keys():
-                        if metric in result:
-                            all_metric_scores[metric].append(result[metric])
+                    # Collect scores
+                    for metric, value in scores.items():
+                        if metric in all_scores and value is not None:
+                            all_scores[metric].append(value)
                 
-                # Average all metric scores
-                ragas_scores = {
-                    metric: sum(scores) / len(scores) if scores else 0.0
-                    for metric, scores in all_metric_scores.items()
+                # Average scores
+                eval_scores = {
+                    metric: sum(values) / len(values) if values else 0.0
+                    for metric, values in all_scores.items()
                 }
                 
-                avg_accuracy = self.ragas_evaluator.calculate_aggregate_score(ragas_scores)
+                avg_accuracy = self.evaluator.calculate_aggregate_score(eval_scores)
                 
             except Exception as e:
-                console.print(f"[yellow]⚠️  Ragas evaluation failed: {e}[/yellow]")
+                console.print(f"[yellow]⚠️  Evaluation failed: {e}[/yellow]")
                 avg_accuracy = 0.5
         
         return {
@@ -261,16 +306,17 @@ class BayesianOptimizer:
                 "avg_latency_seconds": avg_latency,
                 "successful_queries": successful_queries,
                 "total_queries": len(self._qa_pairs),
-                "ragas_answer_relevancy": ragas_scores.get("answer_relevancy"),
-                "ragas_faithfulness": ragas_scores.get("faithfulness"),
-                "ragas_answer_similarity": ragas_scores.get("answer_similarity")
+                "answer_relevancy": eval_scores.get("answer_relevancy"),
+                "faithfulness": eval_scores.get("faithfulness"),
+                "answer_similarity": eval_scores.get("answer_similarity"),
+                "context_recall": eval_scores.get("context_recall")
             },
             "scores": {
                 "accuracy_score": avg_accuracy,
                 "cost_score": 1.0 / (avg_tokens / 1000 + 1),
                 "latency_score": 1.0 / (avg_latency + 0.1)
             },
-            "weighted_score": avg_accuracy  # Pure Ragas aggregate score
+            "weighted_score": avg_accuracy
         }
     
     def _estimate_tokens(self, question: str, context: list, answer: str) -> int:

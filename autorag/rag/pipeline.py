@@ -6,6 +6,7 @@ from typing import List, Dict, Any
 from autorag.rag.groq_client import GroqMultiModelClient
 from autorag.rag.embeddings import EmbeddingService
 from autorag.rag.vector_store import VectorStore
+from autorag.utils.text_utils import chunk_documents
 
 
 class RAGPipeline:
@@ -36,7 +37,7 @@ class RAGPipeline:
     
     def index_documents(self, documents: List[Dict[str, Any]]):
         """
-        Embed and store documents in vector database.
+        Chunk, embed, and store documents in vector database.
         
         Args:
             documents: List of dicts with 'id', 'text', 'metadata'
@@ -44,14 +45,17 @@ class RAGPipeline:
         if not documents:
             return
         
-        # Extract texts for embedding
-        texts = [doc["text"] for doc in documents]
+        # Chunk all documents using shared utility
+        all_chunks = chunk_documents(documents, chunk_size=500, chunk_overlap=50)
         
-        # Generate embeddings in batch (faster)
+        # Extract texts for embedding
+        texts = [chunk["text"] for chunk in all_chunks]
+        
+        # Generate embeddings in batch
         embeddings = self.embedder.embed_batch(texts)
         
         # Store in Pinecone
-        self.vector_store.upsert_documents(documents, embeddings)
+        self.vector_store.upsert_documents(all_chunks, embeddings)
     
     def query(
         self,

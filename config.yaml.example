@@ -1,23 +1,46 @@
 # AutoRAG Configuration Template
 # Copy this to config.yaml and fill in your values
 
-# Database connection
+# Database connection - Choose ONE of the following configurations:
+
+# Option 1: Supabase Storage (default)
 database:
   type: supabase  # Options: supabase, mongodb, postgresql
-  url: 
-  key: 
-  table: 
-  text_column: content
-  id_column: id
+  url: https://your-project.supabase.co
+  key: your-supabase-anon-key
+  bucket: pdf           # Storage bucket name
+  folder: pdf           # Folder path within bucket
+  # For table-based storage (legacy): use 'table' instead of bucket/folder
+
+# Option 2: MongoDB (uncomment and configure)
+# database:
+#   type: mongodb
+#   connection_string: mongodb://localhost:27017
+#   database: your_database_name
+#   collection: documents
+#   text_column: content    # Field containing document text (default: content)
+#   id_column: _id          # Field containing unique ID (default: _id)
+
+# Option 3: PostgreSQL (uncomment and configure)
+# database:
+#   type: postgresql
+#   host: localhost
+#   port: 5432
+#   database: your_database_name
+#   table: documents
+#   user: your_username
+#   password: your_password
+#   text_column: content    # Column containing document text (default: content)
+#   id_column: id           # Column containing unique ID (default: id)
 
 # API keys for external services
 api_keys:
-  groq: 
-  pinecone: 
+  groq: your-groq-api-key
+  pinecone: your-pinecone-api-key
   pinecone_index: autorag
 
 # Optimization settings
 optimization:
-  strategy: grid       
+  strategy: bayesian      # Options: grid, bayesian
   num_experiments: 5
   test_questions: 5

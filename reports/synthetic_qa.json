@@ -1,31 +1,58 @@
 {
   "metadata": {
-    "generated_at": "2025-12-30T18:37:59.149336",
-    "total_pairs": 2,
+    "generated_at": "2025-12-31T10:40:50.301886",
+    "total_pairs": 5,
     "statistics": {
-      "total_documents": 22,
-      "total_questions": 2,
-      "failed_generations": 2,
+      "total_documents": 6,
+      "total_questions": 6,
+      "failed_generations": 3,
       "invalid_qa_pairs": 0
     }
   },
   "qa_pairs": [
     {
-      "question": "What is the expected cost reduction when using AutoRAG?",
-      "answer": "30-40%",
-      "document_id": "18a120cd-a736-4754-b74e-ba219e0d531f",
+      "question": "How many daily interactions are enhanced with contextual memory according to the document?",
+      "answer": "10 billion+",
+      "document_id": "AutoRAG_Dummy_Data.txt_88",
       "metadata": {
-        "generated_at": "2025-12-30T18:37:57.707934",
-        "source_text_preview": "The AutoRAG project aims to automate finding the optimal RAG (Retrieval-Augmented Generation) config..."
+        "generated_at": "2025-12-31T10:40:42.741309",
+        "source_text_preview": "I industry\r\n1 million+ developers building on MemoryLayer AI\r\n100,000+ applications powered by our i..."
       }
     },
     {
-      "question": "What is the primary goal of the AutoRAG project?",
-      "answer": "To automate finding the optimal RAG configuration for databases",
-      "document_id": "18a120cd-a736-4754-b74e-ba219e0d531f",
+      "question": "What is the main idea conveyed by the statistics provided in the document?",
+      "answer": "The document highlights the scale and adoption of MemoryLayer AI, indicating its significant presence and impact in the AI industry.",
+      "document_id": "AutoRAG_Dummy_Data.txt_88",
       "metadata": {
-        "generated_at": "2025-12-30T18:37:57.707953",
-        "source_text_preview": "The AutoRAG project aims to automate finding the optimal RAG (Retrieval-Augmented Generation) config..."
+        "generated_at": "2025-12-31T10:40:42.741333",
+        "source_text_preview": "I industry\r\n1 million+ developers building on MemoryLayer AI\r\n100,000+ applications powered by our i..."
+      }
+    },
+    {
+      "question": "What is the expected annual savings per agent with the MemoryLayer integration for customer support automation?",
+      "answer": "$100K+",
+      "document_id": "AutoRAG_Dummy_Data.txt_32",
+      "metadata": {
+        "generated_at": "2025-12-31T10:40:46.506072",
+        "source_text_preview": "Use Case 3: Customer Support Automation\r\nApplication: Support chatbots and AI agents for SaaS compan..."
+      }
+    },
+    {
+      "question": "How does the MemoryLayer integration enhance customer support automation for SaaS companies?",
+      "answer": "By providing complete customer interaction history, product usage context, preferences for communication style and resolution approaches, escalation patterns, and satisfaction signals.",
+      "document_id": "AutoRAG_Dummy_Data.txt_32",
+      "metadata": {
+        "generated_at": "2025-12-31T10:40:46.506087",
+        "source_text_preview": "Use Case 3: Customer Support Automation\r\nApplication: Support chatbots and AI agents for SaaS compan..."
+      }
+    },
+    {
+      "question": "What is the price range for the Professional offering type?",
+      "answer": "₹3,999/month",
+      "document_id": "AutoRAG_Dummy_Data.txt_49",
+      "metadata": {
+        "generated_at": "2025-12-31T10:40:50.293700",
+        "source_text_preview": "Type: Free Tier\r\nPrice Range: ₹0 (100 requests/day, 10 MB storage)\r\nStrategic Rationale: Developer a..."
       }
     }
   ]
