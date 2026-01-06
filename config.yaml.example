@@ -33,9 +33,22 @@ database:
 #   text_column: content    # Column containing document text (default: content)
 #   id_column: id           # Column containing unique ID (default: id)
 
+# LLM Configuration
+llm:
+  provider: groq          # Options: groq, openai, openrouter
+  model: null             # null = use provider default:
+                          #   groq: llama-3.3-70b-versatile
+                          #   openai: gpt-4o-mini
+                          #   openrouter: meta-llama/llama-3.3-70b-instruct
+
 # API keys for external services
 api_keys:
-  groq: your-groq-api-key
+  # LLM provider keys (only the key for your selected provider is required)
+  groq: your-groq-api-key           # Required if llm.provider=groq
+  openai: your-openai-api-key       # Required if llm.provider=openai
+  openrouter: your-openrouter-key   # Required if llm.provider=openrouter
+  
+  # Vector store (always required)
   pinecone: your-pinecone-api-key
   pinecone_index: autorag
 
@@ -44,3 +57,9 @@ optimization:
   strategy: bayesian      # Options: grid, bayesian
   num_experiments: 5
   test_questions: 5
+
+# Evaluation settings
+evaluation:
+  method: custom          # Options: custom, ragas
+                          #   custom: Built-in token-optimized evaluator
+                          #   ragas: Official RAGAS library (requires: pip install ragas)

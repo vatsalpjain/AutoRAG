@@ -74,20 +74,30 @@ class DatabaseConfig(BaseModel):
         return v
 
 
+class LLMConfig(BaseModel):
+    """LLM provider configuration."""
+    
+    provider: Literal["groq", "openai", "openrouter"] = Field(
+        default="groq",
+        description="LLM provider: groq, openai, or openrouter"
+    )
+    model: Optional[str] = Field(
+        default=None,
+        description="Model name (null = use provider default)"
+    )
+
+
 class APIKeysConfig(BaseModel):
     """API keys for external services."""
     
-    groq: str = Field(description="Groq API key (required - default LLM)")
+    # LLM provider keys (at least one required based on llm.provider)
+    groq: Optional[str] = Field(default=None, description="Groq API key")
+    openai: Optional[str] = Field(default=None, description="OpenAI API key")
+    openrouter: Optional[str] = Field(default=None, description="OpenRouter API key")
+    
+    # Vector store keys
     pinecone: str = Field(description="Pinecone API key")
     pinecone_index: str = Field(default="autorag", description="Pinecone index name")
-    
-    @field_validator("groq")
-    @classmethod
-    def validate_groq_key(cls, v: str) -> str:
-        """Ensure Groq key is not empty."""
-        if not v or v.strip() == "":
-            raise ValueError("Groq API key cannot be empty")
-        return v
     
     @field_validator("pinecone")
     @classmethod
@@ -119,12 +129,33 @@ class OptimizationConfig(BaseModel):
     )
 
 
+class EvaluationConfig(BaseModel):
+    """Evaluation settings."""
+    
+    method: Literal["custom", "ragas"] = Field(
+        default="custom",
+        description="Evaluation method: 'custom' (built-in) or 'ragas' (official library)"
+    )
 class Config(BaseModel):
     """Main configuration object for AutoRAG."""
     
     database: DatabaseConfig
+    llm: LLMConfig = Field(default_factory=LLMConfig)
     api_keys: APIKeysConfig
     optimization: OptimizationConfig
+    evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
+    
+    @field_validator("api_keys")
+    @classmethod
+    def validate_provider_key(cls, v: APIKeysConfig, info: ValidationInfo) -> APIKeysConfig:
+        """Ensure API key exists for selected provider."""
+        llm_config = info.data.get("llm")
+        if llm_config:
+            provider = llm_config.provider
+            key = getattr(v, provider, None)
+            if not key or key.strip() == "":
+                raise ValueError(f"{provider} API key is required when llm.provider='{provider}'")
+        return v
 
 
 def load_config(config_path: str | Path) -> Config:

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
-from autorag.rag.groq_client import GroqMultiModelClient
+from autorag.rag.llm_client import LLMClient
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 
@@ -19,7 +19,9 @@ class SyntheticQAGenerator:
     
     def __init__(
         self,
-        groq_api_key: str,
+        llm_provider: str,
+        llm_api_key: str,
+        llm_model: str = None,
         questions_per_doc: int = 2,
         temperature: float = 0.8
     ):
@@ -27,11 +29,17 @@ class SyntheticQAGenerator:
         Initialize the synthetic Q&A generator.
         
         Args:
-            groq_api_key: Groq API key for LLM access
+            llm_provider: LLM provider (groq, openai, openrouter)
+            llm_api_key: API key for the LLM provider
+            llm_model: Optional model name (uses provider default if None)
             questions_per_doc: Number of questions to generate per document (default: 2)
             temperature: LLM temperature for creativity (0.0-1.0, default: 0.8)
         """
-        self.groq_client = GroqMultiModelClient(api_key=groq_api_key)
+        self.llm_client = LLMClient(
+            provider=llm_provider,
+            api_key=llm_api_key,
+            model=llm_model
+        )
         self.questions_per_doc = questions_per_doc
         self.temperature = temperature
         
@@ -157,7 +165,7 @@ Return your response in this exact JSON format:
 Generate ONLY valid JSON, no other text."""
 
         # Call Groq API (model rotation handled by wrapper)
-        response = self.groq_client.chat.completions.create(
+        response = self.llm_client.chat.completions.create(
             messages=[
                 {
                     "role": "system",

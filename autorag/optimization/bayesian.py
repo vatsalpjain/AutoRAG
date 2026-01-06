@@ -12,7 +12,7 @@ from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 
 from autorag.rag.pipeline import RAGPipeline
-from autorag.evaluation.autorag_eval import AutoRAGEvaluator
+from autorag.evaluation.evaluator_factory import get_evaluator
 
 # Initialize Rich console for terminal output
 console = Console()
@@ -69,18 +69,37 @@ class BayesianOptimizer:
     Intelligently samples configurations to find the best one faster than grid search.
     """
     
-    def __init__(self, pipeline: RAGPipeline, groq_api_key: str = None):
+    def __init__(
+        self,
+        pipeline: RAGPipeline,
+        llm_provider: str = None,
+        llm_api_key: str = None,
+        llm_model: str = None,
+        evaluation_method: str = "custom"
+    ):
         """
         Initialize Bayesian optimizer.
         
         Args:
             pipeline: Initialized RAG pipeline to test configurations with
-            groq_api_key: Groq API key for Ragas evaluation
+            llm_provider: LLM provider (groq, openai, openrouter) for evaluation
+            llm_api_key: API key for the LLM provider
+            llm_model: Optional model name
+            evaluation_method: Evaluation method - 'custom' or 'ragas'
         """
         self.pipeline = pipeline
         self.results = []
         self.study = None  # Optuna study object
-        self.evaluator = AutoRAGEvaluator(groq_api_key) if groq_api_key else None
+        self.evaluation_method = evaluation_method
+        self.evaluator = get_evaluator(
+            method=evaluation_method,
+            llm_provider=llm_provider,
+            llm_api_key=llm_api_key,
+            llm_model=llm_model
+        ) if llm_api_key else None
+        # Track actual method used (may differ if fallback)
+        if self.evaluator:
+            self.evaluation_method = self.evaluator.get_evaluation_method()
         
         # Will be set during optimize()
         self._qa_pairs = None
@@ -376,6 +395,7 @@ class BayesianOptimizer:
             "metadata": {
                 "timestamp": datetime.now().isoformat(),
                 "optimization_method": "bayesian",
+                "evaluation_method": self.evaluation_method,
                 "total_trials": len(self.results),
                 "best_config": self.results[0]["config"] if self.results else None,
                 "best_score": self.study.best_value if self.study else None

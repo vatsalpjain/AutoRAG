@@ -74,18 +74,29 @@ yaml
 
 ```yaml
 database:
-type: supabase
-url: https://xxx.supabase.co
-key: xxx
-table: documents
-  
+  type: supabase  # Options: supabase, mongodb, postgresql
+  url: https://xxx.supabase.co
+  key: xxx
+  bucket: pdf
+  folder: pdf
+
+llm:
+  provider: groq  # Options: groq, openai, openrouter
+  model: null     # null = use provider default
+
 api_keys:
-groq: sk-xxx
-pinecone: pc-xxx
+  groq: sk-xxx       # Required if llm.provider=groq
+  openai: sk-xxx     # Required if llm.provider=openai
+  openrouter: sk-xxx # Required if llm.provider=openrouter
+  pinecone: pc-xxx
 
 optimization:
-num_experiments:20
-test_questions:50
+  strategy: bayesian  # Options: grid, bayesian
+  num_experiments: 20
+  test_questions: 50
+
+evaluation:
+  method: custom      # Options: custom, ragas
 ```
 
 ---
@@ -115,11 +126,18 @@ Start with **Grid Search** (5-10 configs):
 
 ### 6. **Evaluation System**
 
-Test each config:
+Two evaluation options:
 
-* Accuracy (Ragas metrics)
-* Cost (count tokens)
-* Latency (measure time)
+* **Custom** (default): Built-in token-optimized evaluator
+* **RAGAS**: Official RAGAS library wrapper (requires `pip install ragas`)
+
+Metrics (both options):
+* Answer Relevancy
+* Faithfulness  
+* Answer Similarity
+* Context Recall
+
+Also tracks: Cost (tokens) and Latency (time)
 
 Calculate weighted score.
 
@@ -186,10 +204,11 @@ Generate:
 
 **Days 11-12:**
 
-* Ragas evaluation (Using SequenceMatcher similarity for MVP) ✓
+* Evaluation System ✓
+* Custom evaluator with 4 metrics (RAGAS-like) ✓
 * Cost tracking ✓
 * Latency measurement ✓
-* Note: Simple string similarity used instead of Ragas for MVP; cost=token estimation (4 chars/token)
+* Note: Token-optimized custom evaluator; optional RAGAS library support
 
 **Days 13-14:**
 
@@ -205,16 +224,16 @@ Generate:
 
 **Days 15-17:**
 
-* Ragas Evaluation
+* Dual Evaluation System (Custom + RAGAS) ✓
 * Celery + Redis setup
 * Move optimization to background
 * Progress tracking
 
 **Days 18-19:**
 
-* MongoDB + PostgreSQL connectors
-* Test on 3 databases
-* Bayesian Optimization
+* MongoDB + PostgreSQL connectors ✓
+* Test on 3 databases ✓
+* Bayesian Optimization ✓
 
 **Days 20-21:**
 
@@ -270,7 +289,7 @@ Generate:
 * LangChain (framework)
 * Pinecone (vectors)
 * Ragas (evaluation)
-* Groq API
+* Groq / OpenAI / OpenRouter (multi-provider LLM)
 
 **Packaging:**
 
@@ -292,15 +311,18 @@ autorag-optimizer/
 │   │   ├── mongodb.py
 │   │   └── postgres.py
 │   ├── rag/  
-│   │ 	├── embeddings.py
-│   │ 	├── vector_store.py
-│   │  	└── pipeline.py
+│   │   ├── embeddings.py
+│   │   ├── vector_store.py
+│   │   ├── llm_client.py
+│   │   └── pipeline.py
 │   ├── optimization/
 │   │   ├── grid_search.py
-│   │   └── bayesian.py     # Week 3+
+│   │   └── bayesian.py
 │   ├── evaluation/
-│   │   ├── ragas_eval.py
-│   │   └── metrics.py
+│   │   ├── base_evaluator.py    # Abstract interface
+│   │   ├── custom_eval.py       # Built-in evaluator
+│   │   ├── ragas_eval.py        # RAGAS wrapper
+│   │   └── evaluator_factory.py # Factory function
 │   ├── synthetic/
 │   │   └── generator.py
 │   └── utils/

@@ -1,28 +1,38 @@
 """
-AutoRAG Evaluator - Custom evaluation mimicking RAGAS formulas.
-Token-optimized for Groq with simple text parsing (no JSON mode).
+Custom Evaluator - Built-in evaluation with RAGAS-like metrics.
+Token-optimized for multi-provider LLMs with simple text parsing (no JSON mode).
 """
 import numpy as np
 from typing import List, Dict, Any, Optional
-from autorag.rag.groq_client import GroqMultiModelClient
+from autorag.rag.llm_client import LLMClient
 from autorag.rag.embeddings import EmbeddingService
 
 
-class AutoRAGEvaluator:
+class CustomEvaluator:
     """
     Custom RAG evaluator implementing RAGAS-like metrics.
-    Designed for Groq compatibility with token optimization.
+    Designed for multi-provider LLM compatibility with token optimization.
     """
     
-    def __init__(self, groq_api_key: str):
+    def __init__(self, llm_provider: str, llm_api_key: str, llm_model: str = None):
         """
-        Initialize evaluator with Groq client and embeddings.
+        Initialize evaluator with LLM client and embeddings.
         
         Args:
-            groq_api_key: Groq API key for LLM calls
+            llm_provider: LLM provider (groq, openai, openrouter)
+            llm_api_key: API key for the LLM provider
+            llm_model: Optional model name (uses provider default if None)
         """
-        self.llm = GroqMultiModelClient(api_key=groq_api_key)
+        self.llm = LLMClient(
+            provider=llm_provider,
+            api_key=llm_api_key,
+            model=llm_model
+        )
         self.embeddings = EmbeddingService()
+    
+    def get_evaluation_method(self) -> str:
+        """Return the evaluation method identifier."""
+        return "custom"
     
     # ========== METRIC 1: ANSWER SIMILARITY (Embedding-based) ==========
     def compute_similarity(self, text1: str, text2: str) -> float:

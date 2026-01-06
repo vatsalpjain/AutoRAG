@@ -13,7 +13,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 from rich.table import Table
 
 from autorag.rag.pipeline import RAGPipeline
-from autorag.evaluation.autorag_eval import AutoRAGEvaluator
+from autorag.evaluation.evaluator_factory import get_evaluator
 import time
 
 # Initialize Rich console for terminal output
@@ -26,17 +26,36 @@ class GridSearchOptimizer:
     Tests multiple configurations and ranks by weighted score.
     """
     
-    def __init__(self, pipeline: RAGPipeline, groq_api_key: str = None):
+    def __init__(
+        self,
+        pipeline: RAGPipeline,
+        llm_provider: str = None,
+        llm_api_key: str = None,
+        llm_model: str = None,
+        evaluation_method: str = "custom"
+    ):
         """
         Initialize grid search optimizer.
         
         Args:
             pipeline: Initialized RAG pipeline to test configurations with
-            groq_api_key: Groq API key for Ragas evaluation (optional if using SequenceMatcher fallback)
+            llm_provider: LLM provider (groq, openai, openrouter) for evaluation
+            llm_api_key: API key for the LLM provider
+            llm_model: Optional model name
+            evaluation_method: Evaluation method - 'custom' or 'ragas'
         """
         self.pipeline = pipeline
         self.results = []
-        self.evaluator = AutoRAGEvaluator(groq_api_key) if groq_api_key else None
+        self.evaluation_method = evaluation_method
+        self.evaluator = get_evaluator(
+            method=evaluation_method,
+            llm_provider=llm_provider,
+            llm_api_key=llm_api_key,
+            llm_model=llm_model
+        ) if llm_api_key else None
+        # Track actual method used (may differ if fallback)
+        if self.evaluator:
+            self.evaluation_method = self.evaluator.get_evaluation_method()
     
     def define_search_space(self) -> List[Dict[str, Any]]:
         """
@@ -357,6 +376,7 @@ class GridSearchOptimizer:
             "metadata": {
                 "timestamp": datetime.now().isoformat(),
                 "total_configs_tested": len(self.results),
+                "evaluation_method": self.evaluation_method,
                 "best_config": self.results[0]["config"] if self.results else None
             },
             "results": self.results

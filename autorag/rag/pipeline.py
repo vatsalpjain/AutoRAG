@@ -3,7 +3,7 @@ RAG Pipeline - orchestrates retrieval and generation.
 Combines embeddings, vector search, and LLM generation.
 """
 from typing import List, Dict, Any
-from autorag.rag.groq_client import GroqMultiModelClient
+from autorag.rag.llm_client import LLMClient
 from autorag.rag.embeddings import EmbeddingService
 from autorag.rag.vector_store import VectorStore
 from autorag.utils.text_utils import chunk_documents
@@ -14,17 +14,21 @@ class RAGPipeline:
     
     def __init__(
         self,
-        groq_api_key: str,
+        llm_provider: str,
+        llm_api_key: str,
         pinecone_api_key: str,
-        pinecone_index: str
+        pinecone_index: str,
+        llm_model: str = None
     ):
         """
         Initialize RAG pipeline.
         
         Args:
-            groq_api_key: Groq API key for LLM
+            llm_provider: LLM provider (groq, openai, openrouter)
+            llm_api_key: API key for the LLM provider
             pinecone_api_key: Pinecone API key for vector store
             pinecone_index: Pinecone index name
+            llm_model: Optional model name (uses provider default if None)
         """
         # Initialize components
         self.embedder = EmbeddingService()
@@ -33,7 +37,11 @@ class RAGPipeline:
             index_name=pinecone_index,
             dimension=self.embedder.get_dimension()
         )
-        self.groq_client = GroqMultiModelClient(api_key=groq_api_key)
+        self.llm_client = LLMClient(
+            provider=llm_provider,
+            api_key=llm_api_key,
+            model=llm_model
+        )
     
     def index_documents(self, documents: List[Dict[str, Any]]):
         """
@@ -129,7 +137,7 @@ Question: {question}
 Answer: Provide a clear, concise answer based only on the information in the context. If the context doesn't contain relevant information, say so."""
 
         # Call Groq API (model rotation handled by wrapper)
-        response = self.groq_client.chat.completions.create(
+        response = self.llm_client.chat.completions.create(
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that answers questions based on provided context."},
                 {"role": "user", "content": prompt}

@@ -204,10 +204,17 @@ def optimize(
     
     try:
         console.print("  Creating RAG pipeline...", end=" ")
+        # Get LLM config
+        llm_provider = config.llm.provider
+        llm_api_key = getattr(config.api_keys, llm_provider)
+        llm_model = config.llm.model
+        
         pipeline = RAGPipeline(
-            groq_api_key=config.api_keys.groq,
+            llm_provider=llm_provider,
+            llm_api_key=llm_api_key,
             pinecone_api_key=config.api_keys.pinecone,
-            pinecone_index=config.api_keys.pinecone_index
+            pinecone_index=config.api_keys.pinecone_index,
+            llm_model=llm_model
         )
         console.print("[green]✓[/green] Pipeline ready")
         
@@ -296,7 +303,9 @@ def optimize(
         
         # Step 3: Initialize Q&A generator
         qa_generator = SyntheticQAGenerator(
-            groq_api_key=config.api_keys.groq,
+            llm_provider=llm_provider,
+            llm_api_key=llm_api_key,
+            llm_model=llm_model,
             questions_per_doc=1,  # 1 question per chunk (already sampled)
             temperature=0.8  # Higher temperature for diverse questions
         )
@@ -335,15 +344,20 @@ def optimize(
     
     # ========== RUN OPTIMIZATION (Grid or Bayesian based on config) ==========
     strategy = config.optimization.strategy
+    evaluation_method = config.evaluation.method
     
     try:
         if strategy == "bayesian":
             console.print("[bold cyan]🧠 Running Bayesian Optimization (Optuna)[/bold cyan]")
+            console.print(f"  Evaluation Method: [yellow]{evaluation_method.upper()}[/yellow]")
             from autorag.optimization.bayesian import BayesianOptimizer
             
             optimizer = BayesianOptimizer(
                 pipeline=pipeline,
-                groq_api_key=config.api_keys.groq
+                llm_provider=llm_provider,
+                llm_api_key=llm_api_key,
+                llm_model=llm_model,
+                evaluation_method=evaluation_method
             )
             
             console.print(f"  Running {num_experiments} trials with intelligent sampling...\n")
@@ -355,13 +369,17 @@ def optimize(
             
         else:  # Default: grid search
             console.print("[bold cyan]🔍 Running Grid Search Optimization[/bold cyan]")
+            console.print(f"  Evaluation Method: [yellow]{evaluation_method.upper()}[/yellow]")
             
             optimizer = GridSearchOptimizer(
                 pipeline=pipeline,
-                groq_api_key=config.api_keys.groq
+                llm_provider=llm_provider,
+                llm_api_key=llm_api_key,
+                llm_model=llm_model,
+                evaluation_method=evaluation_method
             )
             
-            console.print("  Testing multiple RAG configurations with Ragas evaluation...\n")
+            console.print("  Testing multiple RAG configurations...\n")
             optimizer.optimize(
                 qa_pairs=qa_pairs,
                 max_configs=num_experiments if num_experiments <= 20 else 9,
@@ -374,16 +392,21 @@ def optimize(
         
         # Show best configuration
         best_config = optimizer.get_best_config()
+        actual_eval_method = optimizer.evaluation_method
         console.print(f"\n[bold green]🏆 Optimization Complete![/bold green]")
+        console.print(f"  Evaluation Method: [cyan]{actual_eval_method.upper()}[/cyan]")
         console.print(f"  Best config: [cyan]{best_config['config']['name']}[/cyan]")
-        console.print(f"  Accuracy (Ragas Aggregate): {best_config['metrics']['accuracy']:.3f}")
+        console.print(f"  Accuracy ({actual_eval_method.capitalize()} Aggregate): {best_config['metrics']['accuracy']:.3f}")
         
-        # Show Ragas metric breakdown if available
-        if best_config['metrics'].get('ragas_answer_relevancy') is not None:
-            console.print("\n  [bold]Ragas Metrics Breakdown:[/bold]")
-            console.print(f"    • Answer Relevancy (45%): {best_config['metrics']['ragas_answer_relevancy']:.3f}")
-            console.print(f"    • Faithfulness (35%): {best_config['metrics']['ragas_faithfulness']:.3f}")
-            console.print(f"    • Answer Similarity (20%): {best_config['metrics']['ragas_answer_similarity']:.3f}")
+        # Show metric breakdown if available
+        if best_config['metrics'].get('answer_relevancy') is not None:
+            console.print(f"\n  [bold]{actual_eval_method.capitalize()} Metrics Breakdown:[/bold]")
+            console.print(f"    • Answer Relevancy: {best_config['metrics']['answer_relevancy']:.3f}")
+            console.print(f"    • Faithfulness: {best_config['metrics']['faithfulness']:.3f}")
+            if best_config['metrics'].get('answer_similarity') is not None:
+                console.print(f"    • Answer Similarity: {best_config['metrics']['answer_similarity']:.3f}")
+            if best_config['metrics'].get('context_recall') is not None:
+                console.print(f"    • Context Recall: {best_config['metrics']['context_recall']:.3f}")
         
         console.print(f"\n  Avg Tokens: {best_config['metrics']['avg_tokens']:.0f}")
         console.print(f"  Latency: {best_config['metrics']['avg_latency_seconds']:.2f}s")
@@ -450,9 +473,11 @@ def results(
         raise typer.Exit(code=1)
     
     # ========== DISPLAY METADATA ==========
+    eval_method = metadata.get('evaluation_method', 'custom')
     console.print("[bold cyan]📋 Optimization Summary[/bold cyan]")
     console.print(f"  Timestamp: {metadata.get('timestamp', 'N/A')}")
     console.print(f"  Configurations tested: [yellow]{metadata.get('total_configs_tested', 0)}[/yellow]")
+    console.print(f"  Evaluation Method: [cyan]{eval_method.upper()}[/cyan]")
     
     console.print("\n" + "─" * 80 + "\n")
     
@@ -463,7 +488,7 @@ def results(
     table = Table(show_header=True, header_style="bold magenta", show_lines=True)
     table.add_column("Rank", style="dim", width=6, justify="center")
     table.add_column("Configuration", style="cyan")
-    table.add_column("Ragas Score", justify="right")
+    table.add_column(f"{eval_method.capitalize()} Score", justify="right")
     table.add_column("Avg Tokens", justify="right")
     table.add_column("Latency (s)", justify="right")
     table.add_column("Success Rate", justify="right")
@@ -505,20 +530,23 @@ def results(
     console.print(f"    • temperature: [cyan]{best['config']['temperature']}[/cyan]")
     
     console.print(f"\n  [bold]Performance Metrics:[/bold]")
-    console.print(f"    • Ragas Aggregate Score: [green]{best['metrics']['accuracy']:.3f}[/green]")
+    console.print(f"    • {eval_method.capitalize()} Aggregate Score: [green]{best['metrics']['accuracy']:.3f}[/green]")
     console.print(f"    • Avg Token Usage: [yellow]{best['metrics']['avg_tokens']:.0f}[/yellow] tokens/query")
     console.print(f"    • Avg Latency: [cyan]{best['metrics']['avg_latency_seconds']:.2f}[/cyan] seconds")
     console.print(f"    • Success Rate: [green]{(best['metrics']['successful_queries']/best['metrics']['total_queries'])*100:.0f}%[/green]")
     
-    console.print(f"\n  [bold]Overall Score (Ragas Aggregate):[/bold] [bold green]{best['weighted_score']:.3f}[/bold green]")
+    console.print(f"\n  [bold]Overall Score ({eval_method.capitalize()} Aggregate):[/bold] [bold green]{best['weighted_score']:.3f}[/bold green]")
     
-    # ========== SHOW RAGAS METRICS BREAKDOWN ==========
-    if best['metrics'].get('ragas_answer_relevancy') is not None:
-        console.print(f"\n  [bold]Ragas Metrics Breakdown:[/bold]")
-        console.print(f"    • Answer Relevancy (45%): [cyan]{best['metrics']['ragas_answer_relevancy']:.3f}[/cyan]")
-        console.print(f"    • Faithfulness (35%): [cyan]{best['metrics']['ragas_faithfulness']:.3f}[/cyan]")
-        console.print(f"    • Answer Similarity (20%): [cyan]{best['metrics']['ragas_answer_similarity']:.3f}[/cyan]")
-        console.print(f"\n    [dim]Note: Overall score is the weighted average of these 3 Ragas metrics[/dim]")
+    # ========== SHOW METRICS BREAKDOWN ==========
+    if best['metrics'].get('answer_relevancy') is not None:
+        console.print(f"\n  [bold]{eval_method.capitalize()} Metrics Breakdown:[/bold]")
+        console.print(f"    • Answer Relevancy: [cyan]{best['metrics']['answer_relevancy']:.3f}[/cyan]")
+        console.print(f"    • Faithfulness: [cyan]{best['metrics']['faithfulness']:.3f}[/cyan]")
+        if best['metrics'].get('answer_similarity') is not None:
+            console.print(f"    • Answer Similarity: [cyan]{best['metrics']['answer_similarity']:.3f}[/cyan]")
+        if best['metrics'].get('context_recall') is not None:
+            console.print(f"    • Context Recall: [cyan]{best['metrics']['context_recall']:.3f}[/cyan]")
+        console.print(f"\n    [dim]Note: Overall score is the weighted average of {eval_method} metrics[/dim]")
     else:
         console.print(f"\n  [dim]Individual Ragas metrics not available (fallback mode used)[/dim]")
     
@@ -560,27 +588,33 @@ def results(
     console.print("  3. Use '--show-report' flag to see detailed HTML report")
 
 
-def _format_ragas_breakdown_html(metrics: Dict[str, Any]) -> str:
+def _format_metrics_breakdown_html(metrics: Dict[str, Any], eval_method: str) -> str:
     """
-    Format Ragas metrics breakdown for HTML report.
+    Format metrics breakdown for HTML report.
     
     Args:
-        metrics: Metrics dict containing Ragas scores
+        metrics: Metrics dict containing scores
+        eval_method: Evaluation method name
         
     Returns:
-        HTML string with Ragas breakdown or empty string if not available
+        HTML string with metrics breakdown or empty string if not available
     """
-    if metrics.get('ragas_answer_relevancy') is not None:
-        return f"""
-        <p><strong>Ragas Metrics Breakdown:</strong></p>
+    if metrics.get('answer_relevancy') is not None:
+        breakdown = f"""
+        <p><strong>{eval_method.capitalize()} Metrics Breakdown:</strong></p>
         <ul>
-            <li>Answer Relevancy (45%): {metrics['ragas_answer_relevancy']:.3f}</li>
-            <li>Faithfulness (35%): {metrics['ragas_faithfulness']:.3f}</li>
-            <li>Answer Similarity (20%): {metrics['ragas_answer_similarity']:.3f}</li>
+            <li>Answer Relevancy: {metrics['answer_relevancy']:.3f}</li>
+            <li>Faithfulness: {metrics['faithfulness']:.3f}</li>"""
+        if metrics.get('answer_similarity') is not None:
+            breakdown += f"\n            <li>Answer Similarity: {metrics['answer_similarity']:.3f}</li>"
+        if metrics.get('context_recall') is not None:
+            breakdown += f"\n            <li>Context Recall: {metrics['context_recall']:.3f}</li>"
+        breakdown += f"""
         </ul>
-        <p><em>Note: Overall score is the weighted average of these 3 Ragas metrics</em></p>
+        <p><em>Note: Overall score is the weighted average of {eval_method} metrics</em></p>
         """
-    return "<p><em>Individual Ragas metrics not available</em></p>"
+        return breakdown
+    return "<p><em>Individual metrics not available</em></p>"
 
 
 def _generate_html_report(data: Dict[str, Any], output_dir: Path) -> Path:
@@ -598,6 +632,7 @@ def _generate_html_report(data: Dict[str, Any], output_dir: Path) -> Path:
     
     results_list = data.get("results", [])
     metadata = data.get("metadata", {})
+    eval_method = metadata.get('evaluation_method', 'custom')
     
     # Simple HTML template
     html_content = f"""
@@ -657,6 +692,14 @@ def _generate_html_report(data: Dict[str, Any], output_dir: Path) -> Path:
             color: #28a745;
             font-weight: bold;
         }}
+        .eval-badge {{
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            margin-top: 10px;
+        }}
     </style>
 </head>
 <body>
@@ -664,15 +707,16 @@ def _generate_html_report(data: Dict[str, Any], output_dir: Path) -> Path:
         <h1>🎯 AutoRAG Optimization Report</h1>
         <p>Generated: {metadata.get('timestamp', 'N/A')}</p>
         <p>Configurations Tested: {metadata.get('total_configs_tested', 0)}</p>
+        <div class="eval-badge">📊 Evaluation Method: {eval_method.upper()}</div>
     </div>
     
     <div class="metric-card">
         <h2>🏆 Best Configuration</h2>
         <p><strong>Name:</strong> {results_list[0]['config']['name']}</p>
         <p><strong>Parameters:</strong> top_k={results_list[0]['config']['top_k']}, temperature={results_list[0]['config']['temperature']}</p>
-        <p><strong>Overall Score (Ragas Aggregate):</strong> <span class="score">{results_list[0]['weighted_score']:.3f}</span></p>
-        <p><strong>Ragas Aggregate Score:</strong> {results_list[0]['metrics']['accuracy']:.3f}</p>
-        {_format_ragas_breakdown_html(results_list[0]['metrics'])}
+        <p><strong>Overall Score ({eval_method.capitalize()} Aggregate):</strong> <span class="score">{results_list[0]['weighted_score']:.3f}</span></p>
+        <p><strong>{eval_method.capitalize()} Aggregate Score:</strong> {results_list[0]['metrics']['accuracy']:.3f}</p>
+        {_format_metrics_breakdown_html(results_list[0]['metrics'], eval_method)}
         <p><strong>Avg Tokens:</strong> {results_list[0]['metrics']['avg_tokens']:.0f}</p>
         <p><strong>Latency:</strong> {results_list[0]['metrics']['avg_latency_seconds']:.2f}s</p>
     </div>
@@ -684,7 +728,7 @@ def _generate_html_report(data: Dict[str, Any], output_dir: Path) -> Path:
                 <tr>
                     <th>Rank</th>
                     <th>Config</th>
-                    <th>Ragas Score</th>
+                    <th>{eval_method.capitalize()} Score</th>
                     <th>Avg Tokens</th>
                     <th>Latency (s)</th>
                     <th>Overall Score</th>

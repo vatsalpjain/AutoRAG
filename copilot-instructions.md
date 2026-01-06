@@ -83,8 +83,11 @@ from autorag.utils.config import load_config
 - MongoDB & PostgreSQL connectors (`autorag/database/`)
 - Synthetic Q&A generation (`autorag/synthetic/`)
 - Grid search optimization (`autorag/optimization/`)
-- Ragas evaluation (`autorag/evaluation/`)
 - Celery tasks for async processing
+
+### Evaluation Options
+- **Custom** (`evaluation.method: custom`): Built-in token-optimized evaluator with 4 RAGAS-like metrics
+- **RAGAS** (`evaluation.method: ragas`): Official RAGAS library wrapper (requires: `pip install ragas`)
 
 ### Anti-Patterns
 - ❌ Loop through API calls → ✅ Use batch methods
