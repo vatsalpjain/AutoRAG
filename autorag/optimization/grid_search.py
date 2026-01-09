@@ -92,6 +92,51 @@ class GridSearchOptimizer:
             collection_name=collection_name
         )
     
+    def _generate_smart_configs(
+        self,
+        indexing_combos: List[tuple],
+        query_combos: List[tuple],
+        max_configs: int
+    ) -> Dict[tuple, List[tuple]]:
+        """
+        Generate smart configuration sampling using stratified approach.
+        Ensures all indexing configs get at least 1 query test if budget allows.
+        
+        Returns:
+            Dict mapping each indexing combo to list of query combos to test
+        """
+        import random
+        
+        n_index = len(indexing_combos)
+        n_query = len(query_combos)
+        total_possible = n_index * n_query
+        
+        # If budget covers everything, test all combinations
+        if max_configs >= total_possible:
+            return {idx: list(query_combos) for idx in indexing_combos}
+        
+        # If budget >= indexing configs, ensure each gets at least some queries
+        if max_configs >= n_index:
+            # Calculate how many query tests per indexing config
+            base_per_index = max_configs // n_index
+            remaining = max_configs % n_index
+            
+            config_map = {}
+            for i, idx_combo in enumerate(indexing_combos):
+                # Give base amount + 1 extra to first 'remaining' configs
+                n_queries = base_per_index + (1 if i < remaining else 0)
+                n_queries = min(n_queries, n_query)  # Cap at available queries
+                
+                # Randomly sample query configs for diversity
+                sampled_queries = random.sample(query_combos, n_queries)
+                config_map[idx_combo] = sampled_queries
+            
+            return config_map
+        else:
+            # Budget < indexing configs: randomly sample indexing configs
+            sampled_indexes = random.sample(indexing_combos, max_configs)
+            return {idx: [random.choice(query_combos)] for idx in sampled_indexes}
+    
     def optimize(
         self,
         qa_pairs: List[Dict[str, Any]],
@@ -99,7 +144,12 @@ class GridSearchOptimizer:
         show_progress: bool = True
     ) -> List[Dict[str, Any]]:
         """
-        Run two-phase grid search optimization.
+        Run two-phase grid search optimization with smart stratified sampling.
+        
+        Ensures fair coverage of the search space:
+        - All indexing configs get tested if budget allows
+        - Query configs are distributed evenly across indexing configs
+        - Random sampling within each indexing config for diversity
         
         Args:
             qa_pairs: List of Q&A pairs to test against
@@ -109,6 +159,9 @@ class GridSearchOptimizer:
         Returns:
             List of results sorted by weighted score (best first)
         """
+        import random
+        random.seed(42)  # Reproducible sampling
+        
         # Generate all configuration combinations
         indexing_combos = list(itertools.product(
             self.chunk_sizes, self.chunk_overlaps, self.embedding_models
@@ -117,29 +170,37 @@ class GridSearchOptimizer:
             self.top_k_values, self.temperature_values
         ))
         
-        total_configs = min(len(indexing_combos) * len(query_combos), max_configs)
+        # Use smart stratified sampling
+        config_map = self._generate_smart_configs(indexing_combos, query_combos, max_configs)
+        
+        total_configs = sum(len(queries) for queries in config_map.values())
+        n_indexing_tested = len(config_map)
         
         if show_progress:
-            console.print(f"\n[bold cyan]🔍 Two-Phase Grid Search Optimization[/bold cyan]")
-            console.print(f"  Indexing configs: {len(indexing_combos)} (chunk_size × overlap × embedding)")
-            console.print(f"  Query configs per index: {len(query_combos)} (top_k × temperature)")
-            console.print(f"  Total configurations: {total_configs}")
+            console.print(f"\n[bold cyan]🔍 Smart Grid Search Optimization[/bold cyan]")
+            console.print(f"  Total indexing configs: {len(indexing_combos)} (chunk_size × overlap × embedding)")
+            console.print(f"  Total query configs: {len(query_combos)} (top_k × temperature)")
+            console.print(f"  Budget: {max_configs} experiments")
+            console.print(f"  [green]Strategy: Stratified sampling[/green]")
+            console.print(f"    → Testing {n_indexing_tested}/{len(indexing_combos)} indexing configs")
+            console.print(f"    → {total_configs} total configurations")
             console.print(f"  Evaluating on {len(qa_pairs)} Q&A pairs\n")
         
         config_count = 0
         
-        # OUTER LOOP: Indexing configurations (expensive - requires re-indexing)
-        for idx, (chunk_size, chunk_overlap, emb_model) in enumerate(indexing_combos):
-            if config_count >= max_configs:
-                break
-                
+        # Iterate through selected indexing configs
+        for idx, (idx_combo) in enumerate(config_map.keys()):
+            chunk_size, chunk_overlap, emb_model = idx_combo
+            query_list = config_map[idx_combo]
+            
             # Create unique collection name for this indexing config
             model_short = emb_model.replace("/", "_").replace("-", "_")
             collection_name = f"autorag_c{chunk_size}_o{chunk_overlap}_{model_short}"
             
             if show_progress:
-                console.print(f"\n[bold yellow]📦 Indexing Config {idx+1}/{len(indexing_combos)}[/bold yellow]")
+                console.print(f"\n[bold yellow]📦 Indexing Config {idx+1}/{n_indexing_tested}[/bold yellow]")
                 console.print(f"  chunk_size={chunk_size}, overlap={chunk_overlap}, model={emb_model}")
+                console.print(f"  Testing {len(query_list)} query variations")
             
             # Create new pipeline with these indexing params
             pipeline = self._create_pipeline(
@@ -162,7 +223,7 @@ class GridSearchOptimizer:
             if show_progress:
                 console.print("[green]✓[/green]")
             
-            # INNER LOOP: Query parameters (fast - no re-indexing needed)
+            # Test the assigned query configs for this index
             with Progress(
                 SpinnerColumn(),
                 TextColumn("[progress.description]{task.description}"),
@@ -175,13 +236,10 @@ class GridSearchOptimizer:
                 
                 task = progress.add_task(
                     "Testing query configs...",
-                    total=len(query_combos)
+                    total=len(query_list)
                 )
                 
-                for top_k, temperature in query_combos:
-                    if config_count >= max_configs:
-                        break
-                    
+                for top_k, temperature in query_list:
                     # Build full config
                     config = {
                         "chunk_size": chunk_size,
@@ -205,7 +263,8 @@ class GridSearchOptimizer:
         self.results.sort(key=lambda x: x["weighted_score"], reverse=True)
         
         if show_progress:
-            console.print(f"\n[green]✓[/green] Grid search complete!")
+            console.print(f"\n[green]✓[/green] Smart grid search complete!")
+            console.print(f"  Tested {config_count} configurations across {n_indexing_tested} indexing setups")
             self._display_results_table()
         
         return self.results

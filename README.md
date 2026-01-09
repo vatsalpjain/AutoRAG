@@ -5,12 +5,14 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-AutoRAG-Optim is a CLI tool that automates RAG (Retrieval-Augmented Generation) hyperparameter optimization. Connect your database, run optimization, and get the best RAG configuration in 4-6 hours.
+AutoRAG-Optim is a CLI tool that automates RAG (Retrieval-Augmented Generation) hyperparameter optimization. Connect your database, run optimization, and get the best RAG configuration in minutes to hours.
 
 ## Features
 
 - 🔍 **Automated Optimization** - Bayesian or Grid Search to find optimal RAG parameters
-- 📊 **Synthetic Q&A Generation** - Auto-generate test questions from your documents
+- 📊 **5 Configurable Parameters** - chunk_size, chunk_overlap, embedding_model, top_k, temperature
+- 🗄️ **Local Vector Store** - ChromaDB (no API key needed, runs locally)
+- 📝 **Synthetic Q&A Generation** - Auto-generate test questions from your documents
 - 📈 **RAGAS-like Metrics** - Evaluate accuracy, faithfulness, relevancy, and context recall
 - 🗄️ **Multi-Database Support** - Supabase, MongoDB, PostgreSQL
 - 🤖 **Multi-LLM Support** - Groq, OpenAI, OpenRouter
@@ -19,7 +21,12 @@ AutoRAG-Optim is a CLI tool that automates RAG (Retrieval-Augmented Generation) 
 ## Installation
 
 ```bash
-pip install autorag-optim
+# Clone the repository
+git clone https://github.com/yourusername/autorag-optim.git
+cd autorag-optim
+
+# Install with uv
+uv sync
 ```
 
 ## Quick Start
@@ -42,8 +49,15 @@ llm:
 
 api_keys:
   groq: your-groq-api-key
-  pinecone: your-pinecone-api-key
-  pinecone_index: autorag
+
+# RAG Parameter Search Space (all parameters are lists to search over)
+rag:
+  chunk_size: [256, 500, 1024]
+  chunk_overlap: [25, 50, 100]
+  embedding_model:
+    - all-MiniLM-L6-v2
+  top_k: [3, 5, 10]
+  temperature: [0.3, 0.7, 1.0]
 
 optimization:
   strategy: bayesian
@@ -85,6 +99,27 @@ Options:
 ```
 
 ## Configuration
+
+### RAG Parameters
+
+AutoRAG optimizes 5 RAG parameters in a **two-phase architecture**:
+
+**Indexing Parameters** (require re-indexing, tested in outer loop):
+```yaml
+rag:
+  chunk_size: [256, 500, 1024]     # Characters per chunk
+  chunk_overlap: [25, 50, 100]     # Overlap between chunks
+  embedding_model:                  # HuggingFace model names
+    - all-MiniLM-L6-v2
+    - all-mpnet-base-v2
+```
+
+**Query Parameters** (fast, tested in inner loop):
+```yaml
+rag:
+  top_k: [3, 5, 10]                # Documents to retrieve
+  temperature: [0.3, 0.7, 1.0]     # LLM creativity (0-2)
+```
 
 ### Database Options
 
@@ -145,10 +180,22 @@ evaluation:
 ## How It Works
 
 1. **Connect** - Fetches documents from your database
-2. **Generate** - Creates synthetic Q&A pairs using LLM
-3. **Optimize** - Tests multiple RAG configurations (top_k, temperature)
-4. **Evaluate** - Measures accuracy, cost, and latency for each config
-5. **Report** - Shows best configurations with Pareto frontier
+2. **Display Search Space** - Shows all RAG parameter combinations to test
+3. **Generate** - Creates synthetic Q&A pairs using LLM
+4. **Optimize** - Two-phase optimization:
+   - Outer loop: Tests indexing parameters (chunk_size, overlap, embedding_model)
+   - Inner loop: Tests query parameters (top_k, temperature) on each index
+5. **Evaluate** - Measures accuracy using RAGAS-like metrics
+6. **Report** - Shows best configuration with all parameters
+
+## Vector Store
+
+AutoRAG uses **ChromaDB** for local vector storage:
+
+- ✅ **No API key required** - Runs entirely locally
+- ✅ **Automatic dimension detection** - Works with any embedding model
+- ✅ **Persistent storage** - Vectors saved in `.autorag_cache/`
+- ✅ **Dynamic collections** - Separate index for each config (e.g., `autorag_c500_o50_minilm`)
 
 ## Metrics
 
@@ -158,8 +205,6 @@ evaluation:
 | Faithfulness | Is the answer grounded in retrieved context? |
 | Answer Similarity | How similar is the answer to ground truth? |
 | Context Recall | Does the context contain the required info? |
-| Cost | Token usage estimation |
-| Latency | Response time |
 
 ## Development
 
@@ -169,18 +214,21 @@ git clone https://github.com/yourusername/autorag-optim.git
 cd autorag-optim
 
 # Install with uv
-uv sync
+uv sync --extra dev
 
 # Run CLI
 uv run autorag --help
+
+# Run tests
+uv run pytest tests/ -v
 ```
 
 ## Requirements
 
 - Python 3.10+
-- Pinecone account (vector store)
 - LLM API key (Groq, OpenAI, or OpenRouter)
 - Database (Supabase, MongoDB, or PostgreSQL)
+- **No Pinecone required** - Uses local ChromaDB
 
 ## License
 
