@@ -56,9 +56,11 @@ def chunk_text(
             })
             chunk_idx += 1
         
-        start = end - chunk_overlap
-        if start >= len(text) - chunk_overlap:
+        # CRITICAL: Always advance by at least 1 to prevent infinite loop
+        new_start = max(end - chunk_overlap, start + 1)
+        if new_start >= len(text):
             break
+        start = new_start
     
     return chunks
 

@@ -1,10 +1,9 @@
 """
 Embedding service using HuggingFace sentence-transformers.
-Converts text to 384-dimensional vectors.
+Supports multiple models with automatic dimension detection.
 """
 from sentence_transformers import SentenceTransformer
 from typing import List
-import numpy as np
 
 
 class EmbeddingService:
@@ -16,11 +15,12 @@ class EmbeddingService:
         
         Args:
             model_name: HuggingFace model name (default: all-MiniLM-L6-v2)
-                        Produces 384-dim vectors, fast and efficient
         """
+        self.model_name = model_name
         # Load model (downloads on first run, then cached locally)
         self.model = SentenceTransformer(model_name)
-        self.dimension = 384  # Output dimension for all-MiniLM-L6-v2
+        # Auto-detect dimension from model (works for any model)
+        self.dimension = self.model.get_sentence_embedding_dimension()
     
     def embed_text(self, text: str) -> List[float]:
         """
@@ -57,5 +57,9 @@ class EmbeddingService:
         return embeddings.tolist()
     
     def get_dimension(self) -> int:
-        """Return embedding dimension (384)."""
+        """Return embedding dimension (auto-detected from model)."""
         return self.dimension
+    
+    def get_model_name(self) -> str:
+        """Return the model name being used."""
+        return self.model_name

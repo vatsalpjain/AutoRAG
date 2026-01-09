@@ -1,11 +1,12 @@
 """
 RAG Pipeline - orchestrates retrieval and generation.
 Combines embeddings, vector search, and LLM generation.
+Uses local ChromaDB for vector storage.
 """
 from typing import List, Dict, Any
 from autorag.rag.llm_client import LLMClient
 from autorag.rag.embeddings import EmbeddingService
-from autorag.rag.vector_store import VectorStore
+from autorag.rag.chroma_store import ChromaVectorStore
 from autorag.utils.text_utils import chunk_documents
 
 
@@ -16,9 +17,11 @@ class RAGPipeline:
         self,
         llm_provider: str,
         llm_api_key: str,
-        pinecone_api_key: str,
-        pinecone_index: str,
-        llm_model: str = None
+        llm_model: str = None,
+        embedding_model: str = "all-MiniLM-L6-v2",
+        chunk_size: int = 500,
+        chunk_overlap: int = 50,
+        collection_name: str = "autorag"
     ):
         """
         Initialize RAG pipeline.
@@ -26,17 +29,19 @@ class RAGPipeline:
         Args:
             llm_provider: LLM provider (groq, openai, openrouter)
             llm_api_key: API key for the LLM provider
-            pinecone_api_key: Pinecone API key for vector store
-            pinecone_index: Pinecone index name
             llm_model: Optional model name (uses provider default if None)
+            embedding_model: HuggingFace sentence-transformers model name
+            chunk_size: Characters per chunk for document splitting
+            chunk_overlap: Overlap characters between chunks
+            collection_name: ChromaDB collection name
         """
+        # Store chunking params for index_documents
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+        
         # Initialize components
-        self.embedder = EmbeddingService()
-        self.vector_store = VectorStore(
-            api_key=pinecone_api_key,
-            index_name=pinecone_index,
-            dimension=self.embedder.get_dimension()
-        )
+        self.embedder = EmbeddingService(model_name=embedding_model)
+        self.vector_store = ChromaVectorStore(collection_name=collection_name)
         self.llm_client = LLMClient(
             provider=llm_provider,
             api_key=llm_api_key,
@@ -53,8 +58,12 @@ class RAGPipeline:
         if not documents:
             return
         
-        # Chunk all documents using shared utility
-        all_chunks = chunk_documents(documents, chunk_size=500, chunk_overlap=50)
+        # Chunk using pipeline's configured params
+        all_chunks = chunk_documents(
+            documents, 
+            chunk_size=self.chunk_size, 
+            chunk_overlap=self.chunk_overlap
+        )
         
         # Extract texts for embedding
         texts = [chunk["text"] for chunk in all_chunks]
@@ -62,7 +71,7 @@ class RAGPipeline:
         # Generate embeddings in batch
         embeddings = self.embedder.embed_batch(texts)
         
-        # Store in Pinecone
+        # Store in ChromaDB
         self.vector_store.upsert_documents(all_chunks, embeddings)
     
     def query(

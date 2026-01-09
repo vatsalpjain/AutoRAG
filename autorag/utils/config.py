@@ -3,7 +3,7 @@ Configuration loader and validator for AutoRAG.
 Uses Pydantic for type-safe config validation.
 """
 from pathlib import Path
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 import yaml
 from pydantic import BaseModel, Field, field_validator, ValidationInfo
 
@@ -94,18 +94,7 @@ class APIKeysConfig(BaseModel):
     groq: Optional[str] = Field(default=None, description="Groq API key")
     openai: Optional[str] = Field(default=None, description="OpenAI API key")
     openrouter: Optional[str] = Field(default=None, description="OpenRouter API key")
-    
-    # Vector store keys
-    pinecone: str = Field(description="Pinecone API key")
-    pinecone_index: str = Field(default="autorag", description="Pinecone index name")
-    
-    @field_validator("pinecone")
-    @classmethod
-    def validate_pinecone_key(cls, v: str) -> str:
-        """Ensure Pinecone key is not empty."""
-        if not v or v.strip() == "":
-            raise ValueError("Pinecone API key cannot be empty")
-        return v
+    # NOTE: Pinecone removed - now using local ChromaDB
 
 
 class OptimizationConfig(BaseModel):
@@ -136,6 +125,67 @@ class EvaluationConfig(BaseModel):
         default="custom",
         description="Evaluation method: 'custom' (built-in) or 'ragas' (official library)"
     )
+
+
+class RAGConfig(BaseModel):
+    """
+    RAG parameter search space for optimization.
+    Users define lists of values to try for each parameter.
+    """
+    
+    # === INDEXING PARAMETERS (require re-indexing for each combo) ===
+    chunk_size: List[int] = Field(
+        default=[500],
+        description="Chunk sizes to try (characters)"
+    )
+    chunk_overlap: List[int] = Field(
+        default=[50],
+        description="Chunk overlaps to try (characters)"
+    )
+    embedding_model: List[str] = Field(
+        default=["all-MiniLM-L6-v2"],
+        description="Embedding models to try (HuggingFace names)"
+    )
+    
+    # === QUERY PARAMETERS (fast to test, no re-indexing) ===
+    top_k: List[int] = Field(
+        default=[3, 5, 10],
+        description="Number of documents to retrieve"
+    )
+    temperature: List[float] = Field(
+        default=[0.3, 0.7, 1.0],
+        description="LLM temperature values"
+    )
+    
+    @field_validator("chunk_size", "chunk_overlap", "top_k")
+    @classmethod
+    def validate_positive_ints(cls, v: List[int]) -> List[int]:
+        """Ensure all values are positive integers."""
+        if not v:
+            raise ValueError("At least one value must be specified")
+        if any(x <= 0 for x in v):
+            raise ValueError("All values must be positive")
+        return v
+    
+    @field_validator("temperature")
+    @classmethod
+    def validate_temperature(cls, v: List[float]) -> List[float]:
+        """Ensure temperature values are valid (0-2)."""
+        if not v:
+            raise ValueError("At least one temperature value must be specified")
+        if any(x < 0 or x > 2 for x in v):
+            raise ValueError("Temperature must be between 0 and 2")
+        return v
+    
+    @field_validator("embedding_model")
+    @classmethod
+    def validate_embedding_models(cls, v: List[str]) -> List[str]:
+        """Ensure at least one embedding model is specified."""
+        if not v:
+            raise ValueError("At least one embedding model must be specified")
+        return v
+
+
 class Config(BaseModel):
     """Main configuration object for AutoRAG."""
     
@@ -143,6 +193,7 @@ class Config(BaseModel):
     llm: LLMConfig = Field(default_factory=LLMConfig)
     api_keys: APIKeysConfig
     optimization: OptimizationConfig
+    rag: RAGConfig = Field(default_factory=RAGConfig)
     evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
     
     @field_validator("api_keys")

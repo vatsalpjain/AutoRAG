@@ -47,16 +47,31 @@ api_keys:
   groq: your-groq-api-key           # Required if llm.provider=groq
   openai: your-openai-api-key       # Required if llm.provider=openai
   openrouter: your-openrouter-key   # Required if llm.provider=openrouter
-  
-  # Vector store (always required)
-  pinecone: your-pinecone-api-key
-  pinecone_index: autorag
+  # NOTE: No vector store API key needed - using local ChromaDB
 
 # Optimization settings
 optimization:
   strategy: bayesian      # Options: grid, bayesian
   num_experiments: 5
   test_questions: 5
+
+# RAG Optimization Parameters
+# ===========================
+# AutoRAG tests combinations of these parameters to find your optimal config.
+# More values = more thorough testing but longer runtime.
+rag:
+  # INDEXING PARAMETERS (expensive - each combo requires re-indexing)
+  # Tip: Start with single values, expand after initial results
+  chunk_size: [500]                    # Characters per chunk. Try: [256, 500, 1024]
+  chunk_overlap: [50]                  # Overlap between chunks. Try: [25, 50, 100]
+  embedding_model:                     # HuggingFace sentence-transformers models
+    - all-MiniLM-L6-v2                 # 384 dim, fast (default)
+    # - all-mpnet-base-v2              # 768 dim, better quality
+    # - paraphrase-MiniLM-L6-v2        # 384 dim, paraphrase-focused
+  
+  # QUERY PARAMETERS (fast - tested on each indexed config)
+  top_k: [3, 5, 10]                    # Documents to retrieve per query
+  temperature: [0.3, 0.7, 1.0]         # LLM creativity (0=focused, 1=creative)
 
 # Evaluation settings
 evaluation:

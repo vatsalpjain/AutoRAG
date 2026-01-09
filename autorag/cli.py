@@ -2,20 +2,18 @@
 AutoRAG CLI - Command-line interface for RAG optimization.
 """
 import json
-import typer
-import yaml
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from pathlib import Path
 from typing import Dict, Any
+import typer
 
 from autorag.utils.config import load_config, DatabaseConfig
 from autorag.utils.text_utils import chunk_documents, sample_chunks_for_qa
 from autorag.database.supabase import SupabaseConnector
 from autorag.database.mongodb import MongoDBConnector
 from autorag.database.postgres import PostgreSQLConnector
-from autorag.rag.pipeline import RAGPipeline
 from autorag.synthetic.generator import SyntheticQAGenerator
 from autorag.optimization.grid_search import GridSearchOptimizer
 
@@ -199,91 +197,36 @@ def optimize(
     
     console.print("\n" + "─" * 60 + "\n")
     
-    # ========== INITIALIZE RAG PIPELINE ==========
-    console.print("[bold cyan]🤖 Initializing RAG Pipeline[/bold cyan]")
+    # ========== EXTRACT LLM CONFIG ==========
+    llm_provider = config.llm.provider
+    llm_api_key = getattr(config.api_keys, llm_provider)
+    llm_model = config.llm.model
     
-    try:
-        console.print("  Creating RAG pipeline...", end=" ")
-        # Get LLM config
-        llm_provider = config.llm.provider
-        llm_api_key = getattr(config.api_keys, llm_provider)
-        llm_model = config.llm.model
-        
-        pipeline = RAGPipeline(
-            llm_provider=llm_provider,
-            llm_api_key=llm_api_key,
-            pinecone_api_key=config.api_keys.pinecone,
-            pinecone_index=config.api_keys.pinecone_index,
-            llm_model=llm_model
-        )
-        console.print("[green]✓[/green] Pipeline ready")
-        
-        # Check if index already has vectors
-        stats = pipeline.get_index_stats()
-        vector_count = stats.get('total_vector_count', 0)
-        console.print(f"  Vectors in Pinecone: [yellow]{vector_count}[/yellow]")
-        
-    except Exception as e:
-        console.print(f"[bold red]❌ Failed to initialize RAG pipeline:[/bold red]\n{e}")
-        raise typer.Exit(code=1)
+    # ========== DISPLAY RAG SEARCH SPACE ==========
+    console.print("[bold cyan]🔧 RAG Search Space[/bold cyan]")
     
-    # ========== INDEX DOCUMENTS ==========
-    console.print("\n[bold cyan]📊 Indexing Documents[/bold cyan]")
+    # Extract RAG config
+    rag_config = {
+        "chunk_size": config.rag.chunk_size,
+        "chunk_overlap": config.rag.chunk_overlap,
+        "embedding_model": config.rag.embedding_model,
+        "top_k": config.rag.top_k,
+        "temperature": config.rag.temperature
+    }
     
-    try:
-        # Ask user if they want to re-index (if vectors already exist)
-        skip_indexing = False  # Initialize default value
-        
-        if vector_count > 0:
-            console.print(f"  [yellow]⚠️  Index already contains {vector_count} vectors[/yellow]")
-            reindex = typer.confirm("  Do you want to clear and re-index?", default=False)
-            if reindex:
-                console.print("  Clearing existing vectors...", end=" ")
-                pipeline.clear_index()
-                console.print("[green]✓[/green] Cleared")
-                skip_indexing = False  # Proceed with indexing after clearing
-            else:
-                console.print("  [dim]Skipping indexing, using existing vectors[/dim]")
-                skip_indexing = True  # Skip indexing, use existing vectors
-        
-        if not skip_indexing:
-            console.print(f"  Embedding and indexing {len(documents)} documents...", end=" ")
-            pipeline.index_documents(documents)
-            console.print("[green]✓[/green] Indexed")
-            
-            # Verify indexing
-            new_stats = pipeline.get_index_stats()
-            new_count = new_stats.get('total_vector_count', 0)
-            console.print(f"  Total vectors in index: [yellow]{new_count}[/yellow]")
-        
-    except Exception as e:
-        console.print(f"[bold red]❌ Failed to index documents:[/bold red]\n{e}")
-        raise typer.Exit(code=1)
+    # Calculate total configs
+    n_indexing = len(rag_config['chunk_size']) * len(rag_config['chunk_overlap']) * len(rag_config['embedding_model'])
+    n_query = len(rag_config['top_k']) * len(rag_config['temperature'])
+    total_combos = n_indexing * n_query
     
-    # ========== TEST RAG QUERY ==========
-    console.print("\n[bold cyan]🧪 Testing RAG Pipeline[/bold cyan]")
-    
-    try:
-        # Test with a simple query
-        test_query = "What is the main topic discussed in these documents?"
-        console.print(f"  Query: [dim]{test_query}[/dim]\n")
-        
-        console.print("  Retrieving relevant documents...", end=" ")
-        result = pipeline.query(test_query, top_k=3)
-        console.print("[green]✓[/green] Done\n")
-        
-        # Display answer
-        console.print("  [bold]Answer:[/bold]")
-        console.print(f"  {result['answer']}\n")
-        
-        # Display sources
-        console.print("  [bold]Sources:[/bold]")
-        for i, source in enumerate(result['sources'], 1):
-            console.print(f"    {i}. Score: {source['score']:.3f} | {source['text']}")
-        
-    except Exception as e:
-        console.print(f"[bold red]❌ RAG query failed:[/bold red]\n{e}")
-        raise typer.Exit(code=1)
+    console.print(f"  [bold]Indexing Parameters:[/bold] (expensive - require re-indexing)")
+    console.print(f"    chunk_size: {rag_config['chunk_size']}")
+    console.print(f"    chunk_overlap: {rag_config['chunk_overlap']}")
+    console.print(f"    embedding_model: {rag_config['embedding_model']}")
+    console.print(f"  [bold]Query Parameters:[/bold] (fast - tested on each index)")
+    console.print(f"    top_k: {rag_config['top_k']}")
+    console.print(f"    temperature: {rag_config['temperature']}")
+    console.print(f"  [bold]Total:[/bold] {n_indexing} indexing × {n_query} query = {total_combos} configs")
     
     console.print("\n" + "─" * 60 + "\n")
     
@@ -353,11 +296,12 @@ def optimize(
             from autorag.optimization.bayesian import BayesianOptimizer
             
             optimizer = BayesianOptimizer(
-                pipeline=pipeline,
                 llm_provider=llm_provider,
                 llm_api_key=llm_api_key,
                 llm_model=llm_model,
-                evaluation_method=evaluation_method
+                evaluation_method=evaluation_method,
+                rag_config=rag_config,
+                documents=documents
             )
             
             console.print(f"  Running {num_experiments} trials with intelligent sampling...\n")
@@ -372,17 +316,18 @@ def optimize(
             console.print(f"  Evaluation Method: [yellow]{evaluation_method.upper()}[/yellow]")
             
             optimizer = GridSearchOptimizer(
-                pipeline=pipeline,
                 llm_provider=llm_provider,
                 llm_api_key=llm_api_key,
                 llm_model=llm_model,
-                evaluation_method=evaluation_method
+                evaluation_method=evaluation_method,
+                rag_config=rag_config,
+                documents=documents
             )
             
             console.print("  Testing multiple RAG configurations...\n")
             optimizer.optimize(
                 qa_pairs=qa_pairs,
-                max_configs=num_experiments if num_experiments <= 20 else 9,
+                max_configs=num_experiments if num_experiments <= 100 else 27,
                 show_progress=True
             )
         
