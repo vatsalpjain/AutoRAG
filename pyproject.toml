@@ -1,11 +1,11 @@
 [project]
 name = "autorag-optim"
-version = "0.1.0"
+version = "0.1.1"
 description = "A CLI tool that automates RAG hyperparameter optimization using Bayesian search and synthetic data generation"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
-    { name = "Vatsal Jain", email = "your.email@example.com" }
+    { name = "Vatsal Jain", email = "vatsalpjain@gmail.com" }
 ]
 license = "MIT"
 keywords = ["rag", "optimization", "llm", "ai", "retrieval", "bayesian", "cli", "chromadb", "langchain"]
@@ -47,6 +47,7 @@ dependencies = [
     "tiktoken>=0.12.0",
     "torch>=2.5.1",
     "typer>=0.20.1",
+    "pi169>=0.1",
 ]
 
 [project.optional-dependencies]
